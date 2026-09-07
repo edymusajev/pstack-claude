@@ -2,6 +2,8 @@
 
 Thanks for helping out. This repo is a **port**, not an original work: the `skills/` tree tracks [upstream pstack](https://github.com/cursor/plugins/tree/main/pstack) and gets synced forward periodically. That one fact shapes most of what follows.
 
+[CONTEXT.md](CONTEXT.md) is the glossary for the terms below.
+
 ## The sync boundary
 
 Upstream owns skill content. This port owns the Cursor-to-Claude-Code translation.
@@ -21,22 +23,24 @@ Every substitution is recorded per-skill in [CHANGES.md](CHANGES.md). If you add
 bun tools/sync.mjs pstack <new-upstream-sha>
 ```
 
-`tools/upstream.json` pins the current upstream SHA per component; `tools/substitutions.json` holds the mechanical Cursor-to-Claude rewrites and a denylist of Cursor-isms that need a rewritten sentence rather than a token swap. The tool fetches both upstream revisions, applies the substitutions, writes files whose only local differences came from upstream (new files included), and reports files carrying port-specific edits for manual merge. Any denylist token in a written file fails the run with the file, line, and hint — add a substitution rule or rewrite the sentence, then rerun. The pin advances only on success. Write the CHANGES.md entry from the printed report, then run the generator and the invariant script as usual.
+`tools/upstream.json` pins the current upstream SHA per component; `tools/substitutions.json` holds the mechanical Cursor-to-Claude rewrites and a denylist of Cursor-isms that need a rewritten sentence rather than a token swap. The tool fetches both upstream revisions and derives each upstream file into its port form: the substitutions, then `deriveSkill` in `tools/generate.mjs`, which drops `disable-model-invocation` (or swaps it for `user-invocable: false` on a `principle-*` leaf) and applies the generator's stamps, appending a `## Models` section where upstream has none. It writes files whose only local differences came from upstream (new files included), deletes files upstream removed that the port never edited, and reports files carrying port-specific edits for manual merge. Any denylist token in a written file fails the run with the file, line, and hint — add a substitution rule or rewrite the sentence, then rerun. The pin advances only on success. Write the CHANGES.md entry from the printed report, then run the generator and the tests as usual.
+
+`--dry-run` reports without writing. Passing the pinned SHA itself under `--dry-run` prints the ownership map: every file on the manual-merge list is one the port has forked, and everything else syncs clean.
 
 ## Before you open a PR
 
-Run the generator, then the invariant script:
+Run the generator and the tests:
 
 ```shell
 bun tools/generate.mjs
-bash tests/skill-collision-repro.sh
+bun test tests/
 ```
 
-The generator stamps the root `VERSION` into the three plugin manifests, validates every shared Agent Skill's `name` and `description`, emits one Codex prompt stub per public skill from its `menu-description` frontmatter, rewrites the README slash-command table, and stamps model defaults from `plugins/pstack/models.json`. It also copies the five files declared in `PORTABLE_ASSETS` into the skills-only boundary and removes stale files from their generated directories. `NOTICE-skills.md` is the source for the scoped notice that travels with those skills.
+The generator stamps the root `VERSION` into the three plugin manifests, validates every shared Agent Skill's `name` and `description`, emits one Codex prompt stub per public skill from its row in the README slash-command table, and stamps model defaults from `plugins/pstack/models.json`. It also copies the five files declared in `PORTABLE_ASSETS` into the skills-only boundary and removes stale files from their generated directories. `NOTICE-skills.md` is the source for the scoped notice that travels with those skills.
 
-The same run rejects missing or escaping local Markdown links and direct instructions to open unreachable paths. It also checks for stray model slugs, requires a matching `CHANGES.md` heading, and validates the Codex marketplace and Claude hook paths. CI reruns it and fails on any resulting diff, so commit whatever it changes. Adding a skill means giving it `name` and `description` frontmatter. A public skill also needs a `menu-description` and a name in `README_COMMAND_ORDER` in `tools/generate.mjs`; the generator fails by name if either is missing. Changing a model default means editing `models.json`, never a skill body. A `claude-*` slug in skill prose outside a stamped region fails the generator with the file and line.
+The same run rejects missing or escaping local Markdown links and direct instructions to open unreachable paths. It also checks for stray model slugs, requires a matching `CHANGES.md` heading, validates the Codex marketplace and Claude hook paths, and enforces the plugin layout invariants: no `commands/` directory, no `disable-model-invocation` on any skill, `user-invocable: false` on every `principle-*` leaf, and plugin agents dispatched by their namespaced `pstack:<name>`. CI reruns it and fails on any resulting diff, so commit whatever it changes. Adding a skill means giving it `name` and `description` frontmatter and, unless it is a `principle-*` leaf carrying `user-invocable: false`, a row in the README slash-command table. That row is the source of the Codex slash-menu one-liner and of the table's order; the generator fails by name on a skill without a row or a row without a skill. Changing a model default means editing `models.json`, never a skill body; a role whose `models` is `"panel"` takes the shared panel list, so the panel is written once. `tests/models.test.mjs` pins the file's shape and checks that every role label is named by its skill's prose. A `claude-*` slug in skill prose outside a stamped region fails the generator with the file and line.
 
-The invariant script checks plugin layout and frontmatter flags. Each static check is a named function; `bun test tests/` runs `tests/invariants.test.mjs`, which points the script at fixture trees (via `PSTACK_REPO`) and asserts every check still fails when it should, alongside the Agent Skills boundary and sync-tool tests. The last check is behavioral: it needs the `claude` CLI and API access and makes one haiku call. CI runs everything except that leg via `SKIP_BEHAVIORAL=1`, so run it unflagged at least once before a release.
+`bun test tests/` covers the generator, the sync tool, the link validator, and `tests/invariants.test.mjs`, which builds fixture trees that must trip each layout invariant. One check is behavioral and lives in `tests/skill-collision-repro.sh`: it needs the `claude` CLI and API access and makes one haiku call to prove a user-typed `/plugin:name` reaches a skill with no `commands/` present. CI cannot run it, so run it locally at least once before a release.
 
 If you touched `skills/poteto-mode/scripts/`:
 
@@ -59,10 +63,10 @@ uvx zizmor@1.29.0 --persona pedantic --min-severity low --collect all -- .
 
 - **A `plugins/pstack/commands/` directory.** Claude Code renders commands and user-invocable skills in the same slash menu, so a trampoline paired with its skill duplicates every `/pstack:<name>` row ([#22](https://github.com/michael-denyer/pstack-claude/issues/22)). Codex stubs live in `plugins/pstack/.codex-plugin/prompts/`. An upstream sync will try to reintroduce `commands/`; move any new stubs across.
 - **`disable-model-invocation` in a skill's frontmatter.** On a skill it makes the Skill tool refuse the invocation outright, which breaks the SessionStart mandate. The `principle-*` leaves use `user-invocable: false` instead.
-- **Stale generated output.** The `Generated files current` job reruns `bun tools/generate.mjs` and fails on any diff. Editing `VERSION` without regenerating, hand-editing a manifest's `version` field, or bumping without a matching `CHANGES.md` heading all land here. The same run validates `hooks/hooks.json`: every command must point at an existing, executable script under the plugin.
-- **A missing or escaping local Markdown link.** `tools/validate-skills.mjs` resolves bare, `./`, `../`, and reference-style targets against their Markdown file. Every local target must exist inside `plugins/pstack/skills`. The skills-only CI job repeats the check against the CLI's copied tree.
-- **Prose telling the reader to open a path the install does not carry.** The same tool normalizes backticked paths and checks plugin-only prefixes such as `agents/`, `hooks/`, `commands/`, `.codex-plugin/`, and `.claude-plugin/`, plus any parent-relative `../` path. It fails when the preceding text directly instructs the reader to consult one of those paths, including an instruction wrapped onto the previous line. Describing a runtime path without directing the reader to open it is legal. A Markdown link is caught by the link check; this covers the backticked form that is not a link.
-- **A shell script that fails shellcheck.** Scripts are selected by `.sh` extension or by shebang, so the extensionless hook scripts (`hooks/session-start`) are linted too.
+- **Stale generated output.** The `Generated files current` job reruns `bun tools/generate.mjs` and fails on any diff. Editing `VERSION` without regenerating, hand-editing a manifest's `version` field, or bumping without a matching `CHANGES.md` heading all land here. The same run validates `hooks/hooks.json`: every `${CLAUDE_PLUGIN_ROOT}` path a command names must exist in the plugin.
+- **A missing or escaping local Markdown link.** `tools/validate-skills.mjs` resolves bare, `./`, `../`, and reference-style targets against their Markdown file. Every local target must exist inside `plugins/pstack/skills`.
+- **Prose naming a plugin file the install does not carry.** The same tool resolves every backticked relative path against its Markdown file and against the plugin root. A token that lands on a real file or directory outside `plugins/pstack/skills` (`agents/comment-sicko.md`, `../../hooks/hooks.json`) fails. Tokens that resolve to nothing (placeholders, slash commands, `plugins/pstack/models.json` maintainer notes) pass. A Markdown link is caught by the link check; this covers the backticked form that is not a link.
+- **A shell script that fails shellcheck.** Every `.sh` file outside `node_modules` is linted at warning severity.
 - **An action pinned to a tag.** Use the full 40-character commit SHA with a version comment. A mutable tag can be force-pushed into our runners.
 - **A workflow file that fails `actionlint`.** Invalid YAML, a malformed expression, an unknown runner label, or a `needs:` pointing at a job that does not exist. Run `actionlint` from the repository root.
 - **A Markdown correctness error.** Reversed link syntax, an empty link target, a missing image alt, a fragment link to a heading that is not there, or an undefined or unused reference definition. The rule set is deliberately correctness-only and lives in `.markdownlint-cli2.jsonc`. Run `npx --yes markdownlint-cli2@0.18.1 '**/*.md'`.
@@ -70,11 +74,7 @@ uvx zizmor@1.29.0 --persona pedantic --min-severity low --collect all -- .
 
 ## Dependency updates
 
-Dependabot updates `package.json` but cannot regenerate `bun.lock`, so a bun dependency PR arrives with the two out of sync and fails `bun install --frozen-lockfile`. The `Dependabot lockfile` workflow regenerates the lockfile and pushes it back to the PR branch, so those PRs go green on their own.
-
-It only runs for PRs authored by `dependabot[bot]`, checked via `github.event.pull_request.user.login` rather than `github.actor`, which is spoofable. It is the one job in this repo with `contents: write`.
-
-If you bump a dependency by hand, run `bun install` and commit the resulting `bun.lock` in the same change.
+Dependabot keeps the pinned action SHAs current. The vendored scripts' one runtime dependency (`commander`) follows upstream's pin and moves with `tools/sync.mjs`; `osv-scanner` scans `bun.lock` weekly, so a CVE still surfaces. If you bump it by hand, run `bun install` and commit the resulting `bun.lock` in the same change.
 
 ## Releasing
 

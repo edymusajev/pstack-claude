@@ -9,9 +9,12 @@
 //   CHANGES.md must carry a heading for the current VERSION (release completeness)
 //   each skill's frontmatter (name + description) defines the shared Agent
 //   Skills boundary consumed natively by Codex, Prime, opencode, and Gemini CLI
-//   each public skill's menu-description
+//   README.md's "Slash commands" table (one row per public skill, in editorial
+//   order; the row text is the Codex slash-menu one-liner)
 //     -> its Codex prompt stub in plugins/pstack/.codex-plugin/prompts/
-//     -> its row in README.md's "Slash commands" table
+//   The row set must equal the public skills (every Agent Skill not marked
+//   user-invocable: false); a skill without a row or a row without a skill
+//   fails by name.
 //   plugins/pstack/models.json (the model policy: role defaults, diverse panel,
 //   available slugs, Codex equivalents)
 //     -> each model-consuming skill's "## Models" section
@@ -41,7 +44,7 @@ import {
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { pathIsInside, validateProsePaths, validateSkillsTree } from "./validate-skills.mjs";
+import { markdownFiles, pathIsInside, validateProsePaths, validateSkillsTree } from "./validate-skills.mjs";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -145,15 +148,16 @@ export function stampVersion(text, version, file) {
   return text.replace(/("version"\s*:\s*)"[^"]*"/, `$1"${version}"`);
 }
 
+// Every release heading reads "## <version> - <title>"; the current version
+// must have one. A bump without an entry (or an entry without a bump) ships a
+// release nobody can read about.
 export function assertChangesHeading(changes, version) {
-  const found = changes
-    .split("\n")
-    .some((line) => line === `## ${version}` || line.startsWith(`## ${version} `));
-  if (!found) {
-    throw new Error(
-      `CHANGES.md has no "## ${version}" heading. Every version needs a CHANGES entry; ` +
-        `a bump without one (or an entry without a bump) ships a release nobody can read about.`,
-    );
+  const lines = changes.split("\n");
+  const current = lines.find((line) => line.startsWith(`## ${version} `));
+  if (!current) throw new Error(`CHANGES.md has no "## ${version} - <title>" heading`);
+  const malformed = lines.filter((line) => /^## \d+\.\d+\.\d+/.test(line) && !/^## \d+\.\d+\.\d+ - \S/.test(line));
+  if (malformed.length) {
+    throw new Error(`CHANGES.md release headings read "## <version> - <title>":\n${malformed.join("\n")}`);
   }
 }
 
@@ -203,48 +207,240 @@ export function agentSkills(skillsDir) {
     if (description.length > 1024) {
       throw new Error(`${path}: description exceeds the portable Agent Skills limit of 1024 characters`);
     }
-    skills.push({
-      name,
-      description,
-      menu: frontmatterValue(text, "menu-description"),
-      userInvocable: !front.split("\n").includes("user-invocable: false"),
-    });
+    const flags = front.split("\n");
+    // CHANGES 0.9.8: on a skill the flag makes the Skill tool refuse the
+    // invocation outright, which breaks the SessionStart mandate. Upstream
+    // ships it on every skill; the sync derivation strips it.
+    if (flags.includes("disable-model-invocation: true")) {
+      throw new Error(`${path}: disable-model-invocation: true breaks model-initiated entry (CHANGES 0.9.8)`);
+    }
+    const userInvocable = !flags.includes("user-invocable: false");
+    // CHANGES 0.9.9: principle leaves are read by path from poteto-mode and
+    // stay out of the slash menu.
+    if (name.startsWith("principle-") && userInvocable) {
+      throw new Error(`${path}: principle leaves carry user-invocable: false (CHANGES 0.9.9)`);
+    }
+    skills.push({ name, description, userInvocable });
   }
   return skills;
 }
 
+// Layout invariants that live outside any one skill.
+export function validatePluginLayout(pluginRoot) {
+  // CHANGES 0.9.13 (#22): Claude Code lists a plugin's commands and its
+  // user-invocable skills in the slash menu, so a command trampoline beside a
+  // same-named skill shows twice. The Codex trampolines live in
+  // .codex-plugin/prompts/, which only Codex reads.
+  if (existsSync(join(pluginRoot, "commands"))) {
+    throw new Error("plugins/pstack/commands/ exists; trampolines belong in .codex-plugin/prompts/ (CHANGES 0.9.13)");
+  }
+  // #58: a plugin's agents register under the plugin namespace, so a dispatch
+  // of the bare name errors at runtime with "Agent type 'x' not found".
+  const agentsDir = join(pluginRoot, "agents");
+  const agents = existsSync(agentsDir)
+    ? readdirSync(agentsDir).filter((f) => f.endsWith(".md")).map((f) => f.slice(0, -3))
+    : [];
+  const problems = [];
+  for (const file of markdownFiles(join(pluginRoot, "skills"))) {
+    readFileSync(file, "utf8").split("\n").forEach((line, i) => {
+      for (const name of agents) {
+        if (line.includes(`subagent_type: "${name}"`)) {
+          problems.push(`${relative(pluginRoot, file)}:${i + 1}: subagent_type: "${name}" (use "pstack:${name}")`);
+        }
+      }
+    });
+  }
+  if (problems.length) {
+    throw new Error(`plugin agents are dispatched by their namespaced name:\n${problems.join("\n")}`);
+  }
+}
+
 // A public skill is any Agent Skill not marked user-invocable: false (the
-// principle-* leaves). Each needs the one-liner rendered into the Codex slash
-// menu and README command table.
+// principle-* leaves). Each has a row in the README slash-command table.
 export function publicSkills(skillsDir) {
   return agentSkills(skillsDir)
     .filter((skill) => skill.userInvocable)
-    .map(({ name, menu }) => {
-      if (!menu) {
-        throw new Error(`${join(skillsDir, name, "SKILL.md")}: public skill has no menu-description`);
-      }
-      return { name, menu };
-    });
+    .map(({ name }) => name);
 }
 
+const README_TABLE_HEADER = "| command | use it when |";
+
+// The README table is the source of the Codex slash-menu one-liners and their
+// order. Returns [{ name, menu }] in row order; throws when the row set and the
+// public skills disagree, naming each side's leftovers.
+export function readmeCommands(readme, skillNames) {
+  const lines = readme.split("\n");
+  const range = tableRows(README_TABLE_HEADER, "|")(lines);
+  if (!range) throw new Error(`README.md: "${README_TABLE_HEADER}" table header not found`);
+  const rows = lines.slice(range[0], range[1]).map((line, i) => {
+    const m = line.match(/^\| `\/([^`]+)` \| (.+) \|$/);
+    if (!m) throw new Error(`README.md: slash-command row ${i + 1} is not "| \`/name\` | text |": ${line}`);
+    return { name: m[1], menu: m[2] };
+  });
+  const rowNames = new Set(rows.map((r) => r.name));
+  const skills = new Set(skillNames);
+  const extraRows = [...rowNames].filter((n) => !skills.has(n));
+  const missingRows = [...skills].filter((n) => !rowNames.has(n));
+  if (extraRows.length || missingRows.length) {
+    throw new Error(
+      "README.md slash-command table is out of sync with the public skills" +
+        (extraRows.length ? `; row without a skill: ${extraRows.join(", ")}` : "") +
+        (missingRows.length ? `; skill without a row: ${missingRows.join(", ")}` : ""),
+    );
+  }
+  if (rows.length !== rowNames.size) throw new Error("README.md slash-command table repeats a command");
+  return rows;
+}
+
+// The one Codex entry point per public skill. The second sentence replaces the
+// per-skill Platform note the port used to hand-write into upstream files.
 export function promptStub({ name, menu }) {
-  return `---\nname: ${name}\ndescription: ${menu}\ndisable-model-invocation: true\n---\n\nInvoke the \`${name}\` skill and follow it.\n`;
+  return (
+    `---\nname: ${name}\ndescription: ${menu}\ndisable-model-invocation: true\n---\n\n` +
+    `Invoke the \`${name}\` skill and follow it. Resolve Claude tool names, \`claude-*\` model slugs, and ` +
+    "Claude built-in skills through `poteto-mode/references/codex-tools.md`, including its Per-skill notes.\n"
+  );
 }
 
 const code = (s) => `\`${s}\``;
 const codeList = (models) => models.map(code).join(", ");
 
-// Replace the body of a "## <title>" section (everything up to the next "## "
-// heading or EOF). Throws when the heading is absent — a Models section is a
-// structural anchor, not an optional nicety.
-export function replaceSection(text, title, body, file) {
-  const lines = text.split("\n");
+// Locators find a generator-owned span of a file and return its [start, end)
+// line range, or null when the anchor is absent. The same locator serves the
+// stamp (splice the rendered lines in) and the stray-slug scan (skip the
+// lines it owns), so the two can never disagree about where a region is.
+
+// The body of a "## <title>" section: everything up to the next "## " heading or EOF.
+export const section = (title) => (lines) => {
   const start = lines.indexOf(`## ${title}`);
-  if (start === -1) throw new Error(`${file}: no "## ${title}" section to stamp`);
+  if (start === -1) return null;
   let end = start + 1;
   while (end < lines.length && !lines[end].startsWith("## ")) end++;
-  lines.splice(start + 1, end - start - 1, "", ...body.split("\n"), "");
+  return [start + 1, end];
+};
+
+// The inside of the first ```<lang> fence after a heading line.
+export const fenceUnder = (heading, lang) => (lines) => {
+  const step = lines.findIndex((l) => l.startsWith(heading));
+  if (step === -1) return null;
+  const open = lines.indexOf("```" + lang, step);
+  if (open === -1) return null;
+  const close = lines.indexOf("```", open + 1);
+  return close === -1 ? null : [open + 1, close];
+};
+
+// The rows under a markdown table header (header line, separator, then every
+// consecutive line starting with rowPrefix).
+export const tableRows = (header, rowPrefix) => (lines) => {
+  const start = lines.indexOf(header);
+  if (start === -1) return null;
+  let end = start + 2;
+  while (end < lines.length && lines[end].startsWith(rowPrefix)) end++;
+  return [start + 2, end];
+};
+
+const blankPadded = (body) => ["", ...body.split("\n"), ""];
+
+// Every generator-owned region: the file it lives in (repo-relative), how to
+// find it, and what it renders from the model policy. Adding a stamped region
+// means adding a row here; the stray-slug scan exempts exactly these spans.
+export function regions(models) {
+  const skillFile = (skill) => `plugins/pstack/skills/${skill}/SKILL.md`;
+  const rolesBySkill = new Map();
+  for (const r of models.roles) {
+    if (!rolesBySkill.has(r.skill)) rolesBySkill.set(r.skill, []);
+    rolesBySkill.get(r.skill).push(r);
+  }
+  const reviewers = models.roles.find((r) => r.role === "interrogate reviewers").models;
+  return [
+    ...[...rolesBySkill]
+      .filter(([skill]) => skill !== "interrogate")
+      .map(([skill, roles]) => ({
+        file: skillFile(skill),
+        name: "Models section",
+        locate: section("Models"),
+        appendHeading: "## Models",
+        render: () => blankPadded(modelsSection(roles)),
+      })),
+    {
+      file: skillFile("interrogate"),
+      name: "reviewer table",
+      locate: tableRows("| Subagent | Default model |", "| Reviewer "),
+      render: () => reviewers.map((m, i) => `| Reviewer ${String.fromCharCode(65 + i)} | ${code(m)} |`),
+    },
+    {
+      file: skillFile("setup-pstack"),
+      name: "Models section",
+      locate: section("Models"),
+      render: () => blankPadded(setupModelsSection(models)),
+    },
+    {
+      file: skillFile("setup-pstack"),
+      name: "override sheet",
+      locate: fenceUnder("### 5. Write the override sheet", "markdown"),
+      render: () => [overrideSheetBlock(models)],
+    },
+    {
+      file: "plugins/pstack/skills/poteto-mode/references/codex-tools.md",
+      name: "Model names section",
+      locate: section("Model names"),
+      render: () => blankPadded(codexModelNamesSection(models)),
+    },
+  ];
+}
+
+// Stamp every region the generator owns in `file` (repo-relative). A missing
+// anchor throws: a stamped region is a structural contract with the file, not
+// an optional nicety. With strict: false a missing anchor is left alone.
+export function applyRegions(file, text, models, { strict = true } = {}) {
+  const lines = text.split("\n");
+  for (const region of regions(models).filter((r) => r.file === file)) {
+    const range = region.locate(lines);
+    if (!range) {
+      if (strict) throw new Error(`${file}: no anchor for the ${region.name} to stamp`);
+      continue;
+    }
+    lines.splice(range[0], range[1] - range[0], ...region.render());
+  }
   return lines.join("\n");
+}
+
+// A role's "models" is a list of slugs or the string "panel", which resolves to
+// the shared diverse-model panel so the panel is written once.
+export function resolveModels(models) {
+  return {
+    ...models,
+    roles: models.roles.map((r) => (r.models === "panel" ? { ...r, models: models.panel } : r)),
+  };
+}
+
+export function loadModels() {
+  return resolveModels(JSON.parse(readFileSync(join(repo, "plugins/pstack/models.json"), "utf8")));
+}
+
+// The port's derivation of an upstream file, as tools/sync.mjs applies it
+// before comparing with the local copy. Upstream ships
+// disable-model-invocation: true on every skill; the port drops it on public
+// skills and swaps it for user-invocable: false on principle leaves (CHANGES
+// 0.9.8, 0.9.9). Then the generator's own stamps: a Models section is
+// appended as the last H2 when upstream has none, which is where every
+// hand-added one already sits. A region whose anchor upstream lacks is left
+// unstamped, so the file surfaces on the manual-merge list instead of
+// aborting the sync.
+export function deriveSkill(file, text, models = loadModels()) {
+  let out = text;
+  const skill = file.match(/^plugins\/pstack\/skills\/([^/]+)\/SKILL\.md$/)?.[1];
+  if (skill) {
+    const swap = skill.startsWith("principle-") ? "\nuser-invocable: false\n" : "\n";
+    out = out.replace("\ndisable-model-invocation: true\n", swap);
+  }
+  const lines = out.split("\n");
+  for (const region of regions(models).filter((r) => r.file === file && r.appendHeading)) {
+    if (region.locate(lines)) continue;
+    if (lines.at(-1) !== "") lines.push("");
+    lines.push(region.appendHeading, "");
+  }
+  return applyRegions(file, lines.join("\n"), models, { strict: false });
 }
 
 export function modelsSection(roles) {
@@ -280,30 +476,6 @@ export function overrideSheetBlock(models) {
   );
 }
 
-export function stampOverrideSheet(text, models, file) {
-  const lines = text.split("\n");
-  const step = lines.findIndex((l) => l.startsWith("### 5. Write the override sheet"));
-  if (step === -1) throw new Error(`${file}: no "### 5. Write the override sheet" heading`);
-  const open = lines.indexOf("```markdown", step);
-  if (open === -1) throw new Error(`${file}: no \`\`\`markdown fence under step 5`);
-  const close = lines.indexOf("```", open + 1);
-  if (close === -1) throw new Error(`${file}: unclosed fence under step 5`);
-  lines.splice(open + 1, close - open - 1, overrideSheetBlock(models));
-  return lines.join("\n");
-}
-
-export function stampReviewerTable(text, models, file) {
-  const lines = text.split("\n");
-  const header = lines.indexOf("| Subagent | Default model |");
-  if (header === -1) throw new Error(`${file}: no reviewer table header`);
-  let end = header + 2;
-  while (end < lines.length && lines[end].startsWith("| Reviewer ")) end++;
-  const reviewers = models.roles.find((r) => r.role === "interrogate reviewers").models;
-  const rows = reviewers.map((m, i) => `| Reviewer ${String.fromCharCode(65 + i)} | ${code(m)} |`);
-  lines.splice(header + 2, end - header - 2, ...rows);
-  return lines.join("\n");
-}
-
 export function codexModelNamesSection(models) {
   const strongest = models.roles.filter(
     (r) => r.models.length === 1 && r.models[0] !== models.singleRoleDefault,
@@ -324,106 +496,55 @@ export function codexModelNamesSection(models) {
 }
 
 // After stamping, no claude-* model slug may survive in skill prose outside
-// the generator-owned regions. The scan blanks each owned line range (keeping
-// line numbers stable) and reports whatever still matches.
+// the regions the generator owns in that file.
 const SLUG_RE = /claude-(?:opus|fable|sonnet|haiku)[0-9a-z.-]*/;
 
-// [start, end) line ranges of every generator-owned region in this file.
-export function ownedRanges(lines) {
-  const ranges = [];
-  const sectionStarts = ["## Models", "## Model names"];
-  for (const heading of sectionStarts) {
-    const start = lines.indexOf(heading);
-    if (start === -1) continue;
-    let end = start + 1;
-    while (end < lines.length && !lines[end].startsWith("## ")) end++;
-    ranges.push([start + 1, end]);
-  }
-  const step = lines.findIndex((l) => l.startsWith("### 5. Write the override sheet"));
-  if (step !== -1) {
-    const open = lines.indexOf("```markdown", step);
-    const close = open === -1 ? -1 : lines.indexOf("```", open + 1);
-    if (close !== -1) ranges.push([open + 1, close]);
-  }
-  const table = lines.indexOf("| Subagent | Default model |");
-  if (table !== -1) {
-    let end = table + 2;
-    while (end < lines.length && lines[end].startsWith("| Reviewer ")) end++;
-    ranges.push([table + 2, end]);
-  }
-  return ranges;
-}
-
-export function strayModelSlugs(path, text) {
+export function strayModelSlugs(file, text, models) {
   const lines = text.split("\n");
-  const owned = ownedRanges(lines);
+  const owned = regions(models)
+    .filter((r) => r.file === file)
+    .map((r) => r.locate(lines))
+    .filter(Boolean);
   const strays = [];
   lines.forEach((line, i) => {
     if (!SLUG_RE.test(line)) return;
     if (owned.some(([s, e]) => i >= s && i < e)) return;
-    strays.push(`${path}:${i + 1}: ${line.trim()}`);
+    strays.push(`${file}:${i + 1}: ${line.trim()}`);
   });
   return strays;
 }
 
-// Editorial ordering of the README "Slash commands" table. Set-checked against
-// the public skills on every run: adding or retiring a skill without updating
-// this list fails here by name.
-const README_COMMAND_ORDER = [
-  "poteto-mode", "how", "why", "architect", "arena", "interrogate",
-  "automate-me", "reflect", "tdd", "typescript-best-practices", "teach",
-  "swarm", "technical-writing", "bro", "figure-it-out", "show-me-your-work",
-  "blast-radius", "recall", "setup-pstack", "unslop", "no-comments",
-  "create-verification-skill", "maintain-verification-skill", "deslop",
-  "babysit", "thermo-nuclear-code-quality-review", "make-pr-easy-to-review",
-  "fix-ci", "fix-merge-conflicts", "get-pr-comments", "what-did-i-get-done",
-];
-
-export function renderReadmeTable(readme, skills) {
-  const byName = new Map(skills.map((s) => [s.name, s]));
-  const missing = README_COMMAND_ORDER.filter((n) => !byName.has(n));
-  const extra = skills.filter((s) => !README_COMMAND_ORDER.includes(s.name)).map((s) => s.name);
-  if (missing.length || extra.length) {
-    throw new Error(
-      `README_COMMAND_ORDER in tools/generate.mjs is out of sync with the public skills` +
-        (missing.length ? `; listed but not a skill: ${missing.join(", ")}` : "") +
-        (extra.length ? `; skill without a row: ${extra.join(", ")}` : ""),
-    );
-  }
-  const lines = readme.split("\n");
-  const header = lines.indexOf("| command | use it when |");
-  if (header === -1) throw new Error('README.md: "| command | use it when |" table header not found');
-  let end = header + 1;
-  while (end < lines.length && lines[end].startsWith("|")) end++;
-  const rows = README_COMMAND_ORDER.map((n) => `| \`/${n}\` | ${byName.get(n).menu} |`);
-  lines.splice(header, end - header, "| command | use it when |", "| --- | --- |", ...rows);
-  return lines.join("\n");
-}
-
-// hooks.json names commands as "${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd <script>";
-// both the runner and the named script must exist in the plugin and be
-// executable, or the SessionStart hook fails silently for every user.
+// Every ${CLAUDE_PLUGIN_ROOT}/<path> a hook command names must exist in the
+// plugin, and one the command executes directly must be executable, or the
+// SessionStart hook fails silently for every user.
 export function validateHooks(hooksJson, { statOf }) {
   const problems = [];
   for (const [event, groups] of Object.entries(JSON.parse(hooksJson).hooks ?? {})) {
     for (const group of groups) {
       for (const hook of group.hooks ?? []) {
-        const m = hook.command?.match(/\$\{CLAUDE_PLUGIN_ROOT\}\/([^"\s]+)"?(?:\s+(\S+))?/);
-        if (!m) {
+        const refs = [...hook.command.matchAll(/\$\{CLAUDE_PLUGIN_ROOT\}\/([^"\s]+)/g)].map((m) => m[1]);
+        if (!refs.length) {
           problems.push(`${event}: command does not reference \${CLAUDE_PLUGIN_ROOT}: ${hook.command}`);
           continue;
         }
-        const targets = [m[1]];
-        if (m[1].endsWith("run-hook.cmd") && m[2]) targets.push(`hooks/${m[2]}`);
-        for (const t of targets) {
-          const st = statOf(t);
-          if (!st) problems.push(`${event}: ${t} does not exist`);
-          else if (!(st.mode & 0o111)) problems.push(`${event}: ${t} is not executable`);
-        }
+        const executed = hook.command.replace(/^"/, "").startsWith("${CLAUDE_PLUGIN_ROOT}/");
+        refs.forEach((rel, i) => {
+          const st = statOf(rel);
+          if (!st) problems.push(`${event}: ${rel} does not exist`);
+          else if (i === 0 && executed && !(st.mode & 0o111)) problems.push(`${event}: ${rel} is not executable`);
+        });
       }
     }
   }
   if (problems.length) throw new Error(`hooks.json:\n  ${problems.join("\n  ")}`);
+}
+
+// Write `next` to `path` only when it differs; returns whether it wrote.
+function stampFile(path, next, label) {
+  if (existsSync(path) && readFileSync(path, "utf8") === next) return false;
+  writeFileSync(path, next);
+  console.log(`stamped: ${label}`);
+  return true;
 }
 
 function main() {
@@ -437,68 +558,24 @@ function main() {
 
   for (const file of VERSIONED_MANIFESTS) {
     const path = join(repo, file);
-    const text = readFileSync(path, "utf8");
-    const stamped = stampVersion(text, version, file);
-    if (stamped === text) {
+    if (!stampFile(path, stampVersion(readFileSync(path, "utf8"), version, file), `${file} -> ${version}`)) {
       console.log(`ok: ${file} @ ${version}`);
-    } else {
-      writeFileSync(path, stamped);
-      console.log(`stamped: ${file} -> ${version}`);
     }
   }
 
-  const models = JSON.parse(readFileSync(join(repo, "plugins/pstack/models.json"), "utf8"));
+  const models = loadModels();
   const skillsDir = join(repo, "plugins/pstack/skills");
 
-  const bySkill = new Map();
-  for (const r of models.roles) {
-    if (!bySkill.has(r.skill)) bySkill.set(r.skill, []);
-    bySkill.get(r.skill).push(r);
-  }
-  const stampFile = (path, next, label) => {
-    if (existsSync(path) && readFileSync(path, "utf8") === next) return false;
-    writeFileSync(path, next);
-    console.log(`stamped: ${label}`);
-    return true;
-  };
   let modelStamps = 0;
-  for (const [skill, roles] of bySkill) {
-    const path = join(skillsDir, skill, "SKILL.md");
-    let text = readFileSync(path, "utf8");
-    if (skill === "interrogate") {
-      text = stampReviewerTable(text, models, path);
-    } else {
-      text = replaceSection(text, "Models", modelsSection(roles), path);
-    }
-    if (stampFile(path, text, `skills/${skill}/SKILL.md (models)`)) modelStamps++;
-  }
-  {
-    const path = join(skillsDir, "setup-pstack/SKILL.md");
-    let text = readFileSync(path, "utf8");
-    text = replaceSection(text, "Models", setupModelsSection(models), path);
-    text = stampOverrideSheet(text, models, path);
-    if (stampFile(path, text, "skills/setup-pstack/SKILL.md (models)")) modelStamps++;
-  }
-  {
-    const path = join(skillsDir, "poteto-mode/references/codex-tools.md");
-    const text = readFileSync(path, "utf8");
-    const next = replaceSection(text, "Model names", codexModelNamesSection(models), path);
-    if (stampFile(path, next, "poteto-mode/references/codex-tools.md (models)")) modelStamps++;
+  for (const file of new Set(regions(models).map((r) => r.file))) {
+    const path = join(repo, file);
+    if (stampFile(path, applyRegions(file, readFileSync(path, "utf8"), models), `${file} (models)`)) modelStamps++;
   }
   if (modelStamps === 0) console.log("ok: model-policy sections current");
 
-  const strays = [];
-  const walk = (dir) => {
-    for (const entry of readdirSync(dir)) {
-      if (entry === "node_modules" || entry === "scripts") continue;
-      const full = join(dir, entry);
-      if (statSync(full).isDirectory()) walk(full);
-      else if (entry.endsWith(".md")) {
-        strays.push(...strayModelSlugs(full.slice(repo.length + 1), readFileSync(full, "utf8")));
-      }
-    }
-  };
-  walk(skillsDir);
+  const strays = markdownFiles(skillsDir).flatMap((full) =>
+    strayModelSlugs(full.slice(repo.length + 1), readFileSync(full, "utf8"), models),
+  );
   if (strays.length) {
     throw new Error(
       `claude-* model slugs outside generator-owned regions (move the fact into models.json or reference the role):\n` +
@@ -507,17 +584,16 @@ function main() {
   }
   console.log("ok: no stray model slugs in skill prose");
 
-  const skills = publicSkills(skillsDir);
+  const readmePath = join(repo, "README.md");
+  const skills = readmeCommands(readFileSync(readmePath, "utf8"), publicSkills(skillsDir));
+  console.log(`ok: README slash-command table names the ${skills.length} public skills`);
 
   const promptsDir = join(repo, "plugins/pstack/.codex-plugin/prompts");
   let promptsChanged = 0;
   for (const skill of skills) {
-    const path = join(promptsDir, `${skill.name}.md`);
-    const next = promptStub(skill);
-    if (existsSync(path) && readFileSync(path, "utf8") === next) continue;
-    writeFileSync(path, next);
-    promptsChanged++;
-    console.log(`stamped: .codex-plugin/prompts/${skill.name}.md`);
+    if (stampFile(join(promptsDir, `${skill.name}.md`), promptStub(skill), `.codex-plugin/prompts/${skill.name}.md`)) {
+      promptsChanged++;
+    }
   }
   const expected = new Set(skills.map((s) => `${s.name}.md`));
   for (const file of readdirSync(promptsDir)) {
@@ -526,16 +602,6 @@ function main() {
     console.log(`removed orphan: .codex-plugin/prompts/${file}`);
   }
   if (promptsChanged === 0) console.log(`ok: ${skills.length} Codex prompts current`);
-
-  const readmePath = join(repo, "README.md");
-  const readme = readFileSync(readmePath, "utf8");
-  const nextReadme = renderReadmeTable(readme, skills);
-  if (nextReadme === readme) {
-    console.log("ok: README slash-command table current");
-  } else {
-    writeFileSync(readmePath, nextReadme);
-    console.log("stamped: README.md slash-command table");
-  }
 
   const portable = syncPortableAssets(repo, skillsDir);
   if (portable.stamped === 0 && portable.removed === 0) {
@@ -556,10 +622,12 @@ function main() {
   console.log("ok: .agents/plugins/marketplace.json names the plugin and points at a real path");
 
   const pluginRoot = join(repo, "plugins/pstack");
+  validatePluginLayout(pluginRoot);
+  console.log("ok: no commands/ directory; plugin agents dispatched by namespaced name");
   validateHooks(readFileSync(join(pluginRoot, "hooks/hooks.json"), "utf8"), {
     statOf: (rel) => (existsSync(join(pluginRoot, rel)) ? statSync(join(pluginRoot, rel)) : null),
   });
-  console.log("ok: hooks.json commands point at existing, executable scripts");
+  console.log("ok: hooks.json commands point at files that exist in the plugin");
 }
 
 // Guarded so importing the generator's validation and rendering functions does
