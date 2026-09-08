@@ -57,5 +57,5 @@ The explanation uses the sections defined in `references/explainer-prompt.md`, d
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`. An entry reads `<slug>@<effort>` and names a Claude or Codex model; dispatch each through the [runner table](../poteto-mode/references/runners.md).
 
-- how explorer: `gpt-5.6-terra@high`
-- how explainer: `claude-fable-5-1@xhigh`
+- how explorer: `gpt-6-astra@low`
+- how explainer: `claude-fable-5-1@high`

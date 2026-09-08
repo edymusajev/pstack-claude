@@ -60,7 +60,7 @@ Capture this as seed context (file paths, symbols, commits, PR numbers, linked t
 
 ### Discovery
 
-Before spawning investigators, list the available MCPs in the Claude Code environment. Use the tool list at the top of the system prompt (every MCP appears as a tool with prefix `mcp__<server>__<name>`). Otherwise read `.mcp.json` in the plugin/project, or run `claude mcp list`.
+Before spawning investigators, discover evidence access in the configured investigator runner, following the runner table's read-only access check. For Claude, inspect Claude Code's available tools or `claude mcp list`. For Codex, inspect its own tools and `codex mcp list` from the task's working directory. These are separate inventories; verify required sources with a read-only lookup. Also record sources available only to the parent so they can be supplied as cited evidence or queried by a runner with access.
 
 Map each available MCP to one evidence category:
 
@@ -79,8 +79,8 @@ Aim for a complete **coverage map**, not a minimal one. Document the null, don't
 Launch all matching investigators in a single message so they run concurrently. Don't ask one agent to cover multiple MCPs.
 
 Subagent config (each):
-- runner: your configured `why investigators` entry (default in [Models](#models)), dispatched per the [runner table](../poteto-mode/references/runners.md). This role is Claude-only: a Codex run cannot see Claude Code's MCP servers, which are the evidence base here.
-- `readonly`: `false` (agent mode). **Do not use readonly/Ask mode.** It strips MCP access, which disables MCP-backed investigators entirely. Investigators still shouldn't write anything.
+- runner: your configured `why investigators` entry (default in [Models](#models)), dispatched per the [runner table](../poteto-mode/references/runners.md). Either vendor is supported; use the evidence access established during Discovery and report parent-supplied evidence or runner substitutions.
+- Claude runners: use agent mode with MCP tools available, not a mode that strips them. Codex runners: keep the default read-only run; do not pass `--write` for evidence gathering. Neither runner should modify files or external sources.
 
 Each investigator gets:
 1. The base prompt from `references/investigator-prompt.md`
@@ -113,7 +113,7 @@ Each entry names the category and the kind of "why" it uniquely surfaces. Use it
 
 Only skip with an **explicit, written justification** that goes in the final "Sources Consulted" section. Two valid reasons:
 
-- **No MCP is available for that category** in this environment. Flag this as a gap, not a choice. Example: "Real-time team chat skipped. No matching MCP available, so the conversational record was not searchable."
+- **No source access is available for that category** through the selected runner, parent-supplied evidence, or an available runner with access. Flag this as a gap, not a choice. Example: "Real-time team chat skipped. No matching MCP available, so the conversational record was not searchable."
 - **The source is provably irrelevant**, not just "probably irrelevant." A high bar. Example: "Error / exception tracking skipped. Target is a build-time script with no runtime code path."
 
 If your scope assessment suggests a single-commit trivial target where the PR description already contains the complete answer, you may answer inline **only after** confirming all seven available category searches would be redundant. Say so explicitly. This should be rare.
@@ -122,8 +122,8 @@ If your scope assessment suggests a single-commit trivial target where the PR de
 
 Spawn one synthesizer subagent:
 
-- runner: your configured `why synthesizer` entry (default in [Models](#models)), dispatched per the [runner table](../poteto-mode/references/runners.md). Claude-only, for the MCP access the quality check needs.
-- `readonly`: `false` (agent mode). The synthesizer's quality check spot-verifies citations, which can require MCP access. Readonly/Ask mode strips MCPs and defeats that.
+- runner: your configured `why synthesizer` entry (default in [Models](#models)), dispatched per the [runner table](../poteto-mode/references/runners.md). Either vendor is supported; check its own access to the sources needed for citation verification.
+- Preserve the tools needed to spot-verify citations. Claude uses agent mode with MCP access; Codex stays read-only without `--write`. If a source is inaccessible, report that citation as unverified or ask the parent to check it, identifying the parent check explicitly.
 
 The synthesizer gets:
 1. The investigator findings, including any null results and any categories skipped with justification
@@ -158,5 +158,5 @@ After the Sources Consulted block, if the user's `why` question is a precursor t
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`. An entry reads `<slug>@<effort>` and names a Claude or Codex model; dispatch each through the [runner table](../poteto-mode/references/runners.md).
 
-- why investigators: `claude-sonnet-5@high` (Claude entries only; this role needs Claude Code's MCP servers)
-- why synthesizer: `claude-fable-5-1@xhigh` (Claude entries only; this role needs Claude Code's MCP servers)
+- why investigators: `gpt-6-astra@low`
+- why synthesizer: `claude-fable-5-1@high`

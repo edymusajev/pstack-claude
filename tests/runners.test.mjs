@@ -2,7 +2,7 @@
 // a generated plugin agent (Claude Code's Agent tool takes no full model ID
 // and no effort, so the frontmatter carries both); a Codex entry is a call
 // through scripts/codex-run.sh. This pins the entry grammar, the agent files,
-// and the invariants that keep a Codex model out of an MCP-dependent role.
+// and vendor-neutral routing for evidence-dependent roles.
 import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -64,13 +64,14 @@ describe("entry grammar", () => {
 });
 
 describe("policy invariants", () => {
-  test("a Claude-only role that names a Codex entry fails by role and entry", () => {
-    const bad = {
+  test("evidence-dependent roles accept Codex entries", () => {
+    const policy = {
       ...fixture,
-      roles: [{ role: "why investigators", models: ["gpt-5.6-terra@high"], skill: "why", claudeOnly: true }],
+      roles: ["why investigators", "why synthesizer", "reflect judgment, divergent, synthesizer"].map((role) => ({
+        role, models: ["gpt-5.6-terra@high"], skill: role.startsWith("why") ? "why" : "reflect",
+      })),
     };
-    expect(() => validateModels(bad)).toThrow('role "why investigators" is Claude-only');
-    expect(() => validateModels(bad)).toThrow("gpt-5.6-terra@high");
+    expect(validateModels(policy)).toBe(policy);
   });
 
   test("a duplicate role, an empty role, and an unknown vendor fail", () => {

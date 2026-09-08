@@ -38,11 +38,11 @@ The default role-to-entry mapping is the sheet shape shown in step 5 below. If `
 
 Show every role with its current entry, marking any slug not in the detected set as needing a choice. Ask whether to accept as-is or change specific roles, offering the detected models plus `inherit-parent` and `auto` as the options, and the effort suffix as a second choice per entry. Prefer `AskUserQuestion` over free text. For panel roles (arena runners, architect runners, interrogate reviewers) the value is a list, and one runner runs per entry, alias entries included, so the list length sets the count; keep at least one Claude and one Codex entry in each panel when the user has both, because the adversarial signal comes from vendor diversity. `arena cross-judge pool` is also a list, but Arena selects one value from it whose vendor differs from the parent's when possible. `swarm workers` is the default entry for every worker unless a race or comparison assigns another per arm.
 
-Roles marked Claude-only in [Models](#models) need Claude Code's MCP servers, which a Codex run cannot see. Offer only Claude entries and the aliases for those.
+Offer either vendor for every role. For evidence-dependent roles (`why` investigators and synthesizer, and reflect's judgment lenses), check the selected runner's own tool access as described in the runner table. Codex uses its own MCP configuration; Claude's connections are not forwarded. Report missing access separately from model availability.
 
 ### 4. Validate
 
-Every slug written must be in the detected set, every effort suffix must be one of the listed levels, and every Claude-only role must hold Claude entries or aliases; `inherit-parent` and `auto` always pass. If a chosen value fails, stop and ask again.
+Every slug written must be in the detected set, every effort suffix must be one of the listed levels; `inherit-parent` and `auto` always pass. If a chosen value fails, stop and ask again.
 
 ### 5. Write the override sheet
 
@@ -53,23 +53,23 @@ Write `~/.claude/pstack-models.md` with the shape below. Overwrite the whole fil
 
 Per-role model overrides for pstack skills. Each pstack SKILL.md names its defaults in a Models section; the values here override those defaults. Delete a line to fall back to the skill default. An entry is `<slug>` or `<slug>@<effort>`: a Claude model runs as the matching `pstack:` runner subagent, a Codex model runs through the codex plugin, and a missing effort inherits the session's level. A value of `inherit-parent` or `auto` runs that role on the parent session's model and effort (dispatch `general-purpose`, or `pstack:poteto-agent` for a code-writing brief, with no `model`); an alias entry in a panel list still counts toward that panel's fan-out.
 
-feature, refactoring: gpt-5.6-terra@high
-bug-fix: claude-fable-5-1@xhigh
-perf-issue: claude-fable-5-1@xhigh
-hillclimb: claude-fable-5-1@xhigh
-judgment and prose: claude-fable-5-1@xhigh
+feature, refactoring: gpt-5.6-sol@xhigh
+bug-fix: gpt-6-astra@xhigh
+perf-issue: gpt-6-astra@xhigh
+hillclimb: gpt-6-astra@xhigh
+judgment and prose: claude-fable-5-1@high
 strongest judgment: claude-fable-5-1@xhigh
-how explorer: gpt-5.6-terra@high
-how explainer: claude-fable-5-1@xhigh
-why investigators: claude-sonnet-5@high
-why synthesizer: claude-fable-5-1@xhigh
-reflect tooling: gpt-5.6-terra@xhigh
-reflect judgment, divergent, synthesizer: claude-fable-5-1@xhigh
-arena runners: claude-fable-5-1@xhigh, gpt-6-astra@high, gpt-5.6-terra@xhigh, claude-opus-5@high
-arena cross-judge pool: claude-fable-5-1@xhigh, gpt-6-astra@high, gpt-5.6-terra@xhigh, claude-opus-5@high
-swarm workers: gpt-5.6-terra@high
-architect runners: claude-fable-5-1@xhigh, gpt-6-astra@high, gpt-5.6-terra@xhigh, claude-opus-5@high
-interrogate reviewers: claude-fable-5-1@xhigh, gpt-6-astra@high, gpt-5.6-terra@xhigh, claude-opus-5@high
+how explorer: gpt-6-astra@low
+how explainer: claude-fable-5-1@high
+why investigators: gpt-6-astra@low
+why synthesizer: claude-fable-5-1@high
+reflect tooling: gpt-5.6-sol@high
+reflect judgment, divergent, synthesizer: claude-fable-5-1@high
+arena runners: claude-fable-5-1@xhigh, gpt-6-astra@xhigh
+arena cross-judge pool: claude-fable-5-1@xhigh, gpt-6-astra@xhigh
+swarm workers: gpt-5.6-sol@high
+architect runners: claude-fable-5-1@xhigh, gpt-6-astra@xhigh
+interrogate reviewers: claude-fable-5-1@xhigh, gpt-6-astra@xhigh
 ```
 
 ### 6. Write personal runners for new Claude entries
@@ -114,5 +114,5 @@ Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs
 - Claude models: Fable 5.1 (`claude-fable-5-1`), Fable 5 (`claude-fable-5`), Opus 5 (`claude-opus-5`), Opus 4.8 (`claude-opus-4-8`), Sonnet 5 (`claude-sonnet-5`), Sonnet 4.6 (`claude-sonnet-4-6`), Haiku 4.5 (`claude-haiku-4-5`)
 - Codex models: GPT-6 Astra (`gpt-6-astra`), GPT-5.6 Sol (`gpt-5.6-sol`), GPT-5.6 Terra (`gpt-5.6-terra`), GPT-5.6 Luna (`gpt-5.6-luna`), GPT-5.5 (`gpt-5.5`), GPT-5.4 mini (`gpt-5.4-mini`), GPT-5.3 Codex Spark (`gpt-5.3-codex-spark`)
 - Effort levels: `low`, `medium`, `high`, `xhigh`, `max`; omit the suffix to inherit the session's level
-- Default panel: `claude-fable-5-1@xhigh`, `gpt-6-astra@high`, `gpt-5.6-terra@xhigh`, `claude-opus-5@high`
-- Claude-only roles (they need Claude Code's MCP servers): why investigators; why synthesizer; reflect judgment, divergent, synthesizer
+- Default panel: `claude-fable-5-1@xhigh`, `gpt-6-astra@xhigh`
+- All roles support Claude or Codex entries. Evidence access must be checked in the selected runner; MCP connections are not shared between runtimes.

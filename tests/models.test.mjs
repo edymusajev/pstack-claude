@@ -42,7 +42,6 @@ describe("models.json shape", () => {
         const parsed = parseEntry(entry, models);
         expect(available.has(parsed.slug)).toBe(true);
         if (parsed.effort) expect(EFFORT_LEVELS).toContain(parsed.effort);
-        if (role.claudeOnly) expect(parsed.vendor).toBe("claude");
       }
     }
   });

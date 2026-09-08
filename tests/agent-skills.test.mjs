@@ -342,7 +342,7 @@ describe("Codex model names", () => {
     const section = codexModelNamesSection(models);
 
     expect(section).toContain("gpt-6-astra");
-    for (const role of ["bug-fix", "perf-issue", "hillclimb", "strongest judgment"]) {
+    for (const role of ["judgment and prose", "strongest judgment", "how explainer", "why synthesizer"]) {
       expect(section).toContain(role);
     }
     expect(section).not.toContain("claude-opus-5");

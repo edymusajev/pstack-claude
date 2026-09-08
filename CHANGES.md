@@ -1,3 +1,9 @@
+## 0.10.1 - subscription model defaults and Codex evidence access
+
+Model policy: use Astra low for `how explorer` and `why investigators`, Sol for routine implementation and swarm/tooling work, Fable high for synthesis and prose, and Fable/Astra xhigh for the two-model panel and difficult work. Regenerate all model sections, setup defaults, and runner agents from `models.json`.
+
+Port-specific follow-up: remove the vendor restriction on `why` and reflect roles from the registry, generator, setup, and skill dispatch instructions. Codex uses its own MCP configuration and authentication through the companion runtime; it does not inherit Claude Code connections. The runner guide now requires evidence-access checks in the actual task directory, labels parent-supplied evidence, and records unavailable sources. `why` discovery and `why`/reflect citation checks follow the selected runtime, with Codex evidence gathering remaining read-only. This changes routing eligibility, not local MCP configuration or authentication.
+
 # CHANGES — applied substitutions
 
 This port applies the Cursor → Claude Code substitutions in skill bodies. Earlier drafts left them flagged; this revision resolves them. A later pass added a Codex build that shares the same skills; see [Codex port](#codex-port) below.

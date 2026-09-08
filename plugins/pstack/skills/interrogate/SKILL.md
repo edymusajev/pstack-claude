@@ -39,9 +39,7 @@ Launch all reviewers in a single message using the `Agent` tool. Use the `interr
 | Reviewer | Default entry |
 |---|---|
 | Reviewer A | `claude-fable-5-1@xhigh` |
-| Reviewer B | `gpt-6-astra@high` |
-| Reviewer C | `gpt-5.6-terra@xhigh` |
-| Reviewer D | `claude-opus-5@high` |
+| Reviewer B | `gpt-6-astra@xhigh` |
 
 For each reviewer:
 - runner: the configured `interrogate reviewers` entry, or the table default with no configured line, dispatched per the [runner table](../poteto-mode/references/runners.md)

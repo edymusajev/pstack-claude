@@ -6,12 +6,12 @@ pstack names models as entries. An entry reads `<slug>` or `<slug>@<effort>`: th
 
 | Entry | Vendor | Runs as | Dispatch |
 |---|---|---|---|
-| `gpt-5.6-terra@high` | codex | GPT-5.6 Terra, high effort | `../scripts/codex-run.sh --model gpt-5.6-terra --effort high` |
+| `gpt-5.6-sol@xhigh` | codex | GPT-5.6 Sol, xhigh effort | `../scripts/codex-run.sh --model gpt-5.6-sol --effort xhigh` |
+| `gpt-6-astra@xhigh` | codex | GPT-6 Astra, xhigh effort | `../scripts/codex-run.sh --model gpt-6-astra --effort xhigh` |
+| `claude-fable-5-1@high` | claude | Fable 5.1, high effort | `subagent_type: "pstack:fable-5-1-high"` |
 | `claude-fable-5-1@xhigh` | claude | Fable 5.1, xhigh effort | `subagent_type: "pstack:fable-5-1-xhigh"` |
-| `claude-sonnet-5@high` | claude | Sonnet 5, high effort | `subagent_type: "pstack:sonnet-5-high"` |
-| `gpt-5.6-terra@xhigh` | codex | GPT-5.6 Terra, xhigh effort | `../scripts/codex-run.sh --model gpt-5.6-terra --effort xhigh` |
-| `gpt-6-astra@high` | codex | GPT-6 Astra, high effort | `../scripts/codex-run.sh --model gpt-6-astra --effort high` |
-| `claude-opus-5@high` | claude | Opus 5, high effort | `subagent_type: "pstack:opus-5-high"` |
+| `gpt-6-astra@low` | codex | GPT-6 Astra, low effort | `../scripts/codex-run.sh --model gpt-6-astra --effort low` |
+| `gpt-5.6-sol@high` | codex | GPT-5.6 Sol, high effort | `../scripts/codex-run.sh --model gpt-5.6-sol --effort high` |
 
 ## Claude entries
 
@@ -35,7 +35,9 @@ If `${CLAUDE_PLUGIN_ROOT}` is not expanded where you read this, the script is `s
 
 Flags: `--model` and `--effort` come from the entry. `--prompt-file` carries the brief; a short brief can be passed as positional text instead. The run is read-only unless `--write` is passed. Pass it only for a brief that must produce files, together with `--cwd <worktree>` so the writes land in that candidate's own tree. `--background` returns a job id instead of blocking; read it back with `/codex:result`. The script prints Codex's final message on stdout, which the `Bash` tool returns to you as the runner's result.
 
-What a Codex runner lacks. It runs in the codex CLI's own sandbox with the codex CLI's own tools. It cannot reach Claude Code's MCP servers, the `verify` and `run` built-ins, or other pstack skills, and it does not read `poteto-mode`. Roles marked Claude-only in a Models section (the `why` roles and reflect's judgment lenses) depend on those and stay on Claude entries; the generator refuses a Codex default for them. Reviewing a diff, judging candidates, exploring a checked-out tree, and writing a self-contained candidate are all fine.
+Tool access follows the runner. Codex uses the local Codex CLI's configuration and authentication, including its own MCP servers. It does not inherit Claude Code's MCP connections or the `verify` and `run` built-ins. Every role may use either vendor. For a brief requiring external evidence, inspect the selected runner's available tools and verify access with a read-only lookup before relying on that source; a configured server alone is not proof of authentication or access. Pass the same `--cwd` for discovery and the actual task so project configuration matches. Never infer Codex availability from Claude's tool list.
+
+If a required source is available only to the parent, the parent can fetch it and pass a dated, cited evidence file to Codex. Mark that evidence as parent-supplied; the delegate must not claim to have queried or independently verified it. Otherwise use a runner with access for that source and report the substitution, or record the source as unavailable. Do not silently omit evidence categories. Read-only evidence gathering does not require `--write`; keep repository writes disabled. Supply the role's prompt and relevant skill file paths explicitly: Codex does not invoke Claude's Skill tool, but can read supplied instructions from disk.
 
 Requirements. The codex plugin (`/plugin install codex@openai-codex`) and a logged-in codex CLI (`/codex:setup`). The script finds the newest installed plugin version; set `PSTACK_CODEX_COMPANION` to a `codex-companion.mjs` path to pin one. If the script reports that the plugin is missing, send that entry's brief to the nearest Claude entry in the same panel instead, note the substitution in the verdict, and do not block the skill on it.
 

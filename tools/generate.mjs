@@ -555,8 +555,8 @@ export function resolveModels(models) {
 
 // The cross-file contracts a resolved policy must satisfy: every entry parses
 // against the available list, every role is unique and non-empty, a role
-// marked claudeOnly (it needs Claude Code's MCP servers, which a Codex run
-// cannot see) names only Claude entries, and every vendor is one we dispatch.
+// can use either vendor, and every vendor is one we dispatch. Tool access is
+// checked in the selected runner at runtime, not inferred from its vendor.
 export function validateModels(models) {
   for (const a of models.available) {
     if (!VENDORS.includes(a.vendor)) {
@@ -571,12 +571,7 @@ export function validateModels(models) {
       throw new Error(`models.json: role "${role.role}" names no entries`);
     }
     for (const entry of role.models) {
-      const parsed = parseEntry(entry, models);
-      if (role.claudeOnly && parsed.vendor !== "claude") {
-        throw new Error(
-          `models.json: role "${role.role}" is Claude-only (it needs Claude Code's MCP servers) but names ${entry}`,
-        );
-      }
+      parseEntry(entry, models);
     }
   }
   for (const entry of models.panel) parseEntry(entry, models);
@@ -612,11 +607,9 @@ export function deriveSkill(file, text, models = loadModels()) {
   return applyRegions(file, lines.join("\n"), models, { strict: false });
 }
 
-const CLAUDE_ONLY_NOTE = " (Claude entries only; this role needs Claude Code's MCP servers)";
-
 export function modelsSection(roles) {
   const bullets = roles
-    .map((r) => `- ${r.role}: ${codeList(r.models)}${r.claudeOnly ? CLAUDE_ONLY_NOTE : ""}`)
+    .map((r) => `- ${r.role}: ${codeList(r.models)}`)
     .join("\n");
   return (
     "Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). " +
@@ -633,14 +626,13 @@ export function setupModelsSection(models) {
       .filter((m) => m.vendor === vendor)
       .map((m) => `${m.label} (${code(m.slug)})`)
       .join(", ");
-  const claudeOnly = models.roles.filter((r) => r.claudeOnly).map((r) => r.role).join("; ");
   return (
     "Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`).\n\n" +
     `- Claude models: ${list("claude")}\n` +
     `- Codex models: ${list("codex")}\n` +
     `- Effort levels: ${codeList(EFFORT_LEVELS)}; omit the suffix to inherit the session's level\n` +
     `- Default panel: ${codeList(models.panel)}\n` +
-    `- Claude-only roles (they need Claude Code's MCP servers): ${claudeOnly}`
+    "- All roles support Claude or Codex entries. Evidence access must be checked in the selected runner; MCP connections are not shared between runtimes."
   );
 }
 

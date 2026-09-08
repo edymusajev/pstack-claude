@@ -87,4 +87,4 @@ The caller's usage is written first and the type sketch derived from it. One fil
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`. An entry reads `<slug>@<effort>` and names a Claude or Codex model; dispatch each through the [runner table](../poteto-mode/references/runners.md).
 
-- architect runners: `claude-fable-5-1@xhigh`, `gpt-6-astra@high`, `gpt-5.6-terra@xhigh`, `claude-opus-5@high`
+- architect runners: `claude-fable-5-1@xhigh`, `gpt-6-astra@xhigh`
