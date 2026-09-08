@@ -31,7 +31,7 @@ Skip Phase A only when the work is genuinely greenfield with no surrounding syst
 
 Run the **arena** skill with the design-sketch task and the Phase A grounding artifacts. Pass `references/runner-prompt.md` as each runner's prompt. Each candidate produces a design package shaped per `references/rationale-template.md`.
 
-Use your configured architect runners (defaults in [Models](#models)).
+Use your configured architect runners (defaults in [Models](#models)), each dispatched per the [runner table](../poteto-mode/references/runners.md); the arena skill handles the fan-out.
 
 Design it twice. Require at least two structurally distinct candidates before synthesis, even when the first looks sufficient. This is the **exhaust-the-design-space** principle skill made concrete. Whole-shape alternatives, not point fixes inside one shape.
 
@@ -85,6 +85,6 @@ The caller's usage is written first and the type sketch derived from it. One fil
 
 ## Models
 
-Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
+Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`. An entry reads `<slug>@<effort>` and names a Claude or Codex model; dispatch each through the [runner table](../poteto-mode/references/runners.md).
 
-- architect runners: `claude-opus-5`, `claude-fable-5`, `claude-sonnet-5`
+- architect runners: `claude-fable-5-1@xhigh`, `gpt-6-astra@high`, `gpt-5.6-terra@xhigh`, `claude-opus-5@high`

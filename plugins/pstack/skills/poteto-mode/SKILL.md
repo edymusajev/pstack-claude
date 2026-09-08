@@ -89,9 +89,9 @@ Read the leaf skill in full for any principle you apply. Each entry names when i
 
 ## Subagents
 
-**Use `subagent_type: "pstack:poteto-agent"` for any subagent you spawn inside a playbook step** (code-writing delegates, ad-hoc helpers). Plugin agents register under the plugin namespace; the bare name `poteto-agent` errors. `/poteto-mode` and `poteto-agent` route through the same wrapper. Routed workflow skills (`how`, `why`, `interrogate`, `reflect`, `swarm`) set their own `subagent_type` for diverse-model review; respect what the skill prescribes, don't override to `poteto-agent`.
+**Every subagent you spawn inside a playbook step runs on a role's runner.** A role's entry (`<slug>@<effort>`, from `~/.claude/pstack-models.md` or the defaults in [Models](#models)) resolves through the [runner table](references/runners.md): a Claude entry is a generated `pstack:` subagent that reads this skill before writing code, a Codex entry is a `scripts/codex-run.sh` call. Use `subagent_type: "pstack:poteto-agent"` only for an ad-hoc helper with no role, or when the role's entry is `inherit-parent`; plugin agents register under the plugin namespace, so the bare name `poteto-agent` errors. Routed workflow skills (`how`, `why`, `interrogate`, `reflect`, `swarm`) name their own roles; respect what the skill prescribes.
 
-**Defaults for every `Agent` call.** `run_in_background: true`, full tool access (do not pick a subagent_type that strips MCP), file pointers not inlined context, explicit model per role (configurable via `/setup-pstack`; role defaults in [Models](#models), with "judgment and prose" covering prose and judgment). Code delegates tier by difficulty. The hardest changes (cross-cutting design, gnarly concurrency, subtle algorithms) go to your strongest-judgment model (default in [Models](#models)), whether the task needs judgment on vague intent or is a precisely specified sequence of steps to execute to the letter; trivial mechanical edits go to your fast code model; everything else uses the single-role default. Multi-model panels run the configured panel for diversity, with defaults enumerated in each panel skill's Models section (`arena`, `architect`, `interrogate`). Per-role `/setup-pstack` lines override these defaults and the model choices in the routed skills (`how`, `why`, `arena`, `swarm`, `architect`, `interrogate`, `reflect`); a role with no line keeps its default, and a role line of `inherit-parent` or `auto` runs that role on the parent session's model (omit `model` on the `Agent` call).
+**Defaults for every delegate.** `run_in_background: true`, full tool access for Claude runners (do not pick a subagent_type that strips MCP), file pointers not inlined context, explicit runner per role (configurable via `/setup-pstack`; role defaults in [Models](#models), with "judgment and prose" covering prose and judgment). Code delegates tier by difficulty. The hardest changes (cross-cutting design, gnarly concurrency, subtle algorithms) go to your strongest-judgment entry (default in [Models](#models)), whether the task needs judgment on vague intent or is a precisely specified sequence of steps to execute to the letter; mechanical edits and everyday features go to the `feature, refactoring` entry. Panels run the configured cross-vendor panel for diversity, with defaults enumerated in each panel skill's Models section (`arena`, `architect`, `interrogate`). A Codex delegate cannot reach Claude Code's MCP servers or the `verify` and `run` built-ins, so a brief that needs them goes to a Claude entry. Per-role `/setup-pstack` lines override these defaults and the entries in the routed skills (`how`, `why`, `arena`, `swarm`, `architect`, `interrogate`, `reflect`); a role with no line keeps its default, and a role line of `inherit-parent` or `auto` runs that role on the parent session's model and effort (`pstack:poteto-agent` with no `model`).
 
 You own every subagent's work. Review the diff and write your own summary, don't pass through what it said. Interrupt-chained resumes silently drop directives, so fire a fresh subagent with consolidated scope rather than trusting a "done" summary. **Stop the abandoned agent first, and confirm it stopped.** In the agent listing `completed` means the completion was *notified*, not that the process exited: an agent with live background children reports completed and then resumes. Only an explicit stop ends it, and the stop tool may be deferred, so load it before you need it. The tell that one is still running is a claim about the working tree that `git status` contradicts. A second opinion is the same prompt against a different model. Agreement is high-signal.
 
@@ -144,11 +144,11 @@ A large or cross-cutting effort (a migration across many call sites, an ambitiou
 
 ## Models
 
-Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
+Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`. An entry reads `<slug>@<effort>` and names a Claude or Codex model; dispatch each through the [runner table](../poteto-mode/references/runners.md).
 
-- feature, refactoring: `claude-opus-5`
-- bug-fix: `claude-fable-5`
-- perf-issue: `claude-fable-5`
-- hillclimb: `claude-fable-5`
-- judgment and prose: `claude-opus-5`
-- strongest judgment: `claude-fable-5`
+- feature, refactoring: `gpt-5.6-terra@high`
+- bug-fix: `claude-fable-5-1@xhigh`
+- perf-issue: `claude-fable-5-1@xhigh`
+- hillclimb: `claude-fable-5-1@xhigh`
+- judgment and prose: `claude-fable-5-1@xhigh`
+- strongest judgment: `claude-fable-5-1@xhigh`

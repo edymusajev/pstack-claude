@@ -36,18 +36,18 @@ Write one clear paragraph. If you're unsure about the intent, ask the user befor
 
 Launch all reviewers in a single message using the `Agent` tool. Use the `interrogate reviewers` list from `~/.claude/pstack-models.md` when present, one reviewer per entry, extending or shrinking the Reviewer A/B/C/D labels below to the configured entry count; otherwise use the table defaults.
 
-| Subagent | Default model |
-|----------|---------------|
-| Reviewer A | `claude-opus-5` |
-| Reviewer B | `claude-fable-5` |
-| Reviewer C | `claude-sonnet-5` |
+| Reviewer | Default entry |
+|---|---|
+| Reviewer A | `claude-fable-5-1@xhigh` |
+| Reviewer B | `gpt-6-astra@high` |
+| Reviewer C | `gpt-5.6-terra@xhigh` |
+| Reviewer D | `claude-opus-5@high` |
 
 For each reviewer:
-- `subagent_type`: `general-purpose`
-- `model`: the configured `interrogate reviewers` entry, or the table default with no configured line
-- `readonly`: `true`
+- runner: the configured `interrogate reviewers` entry, or the table default with no configured line, dispatched per the [runner table](../poteto-mode/references/runners.md)
+- `readonly`: `true` (a Codex entry is read-only unless `--write` is passed; never pass it here)
 
-If a model slug is rejected as unresolvable when you try to spawn the subagent, check the valid slugs in the Agent tool's error message, pick the closest equivalent (prefer the highest-reasoning tier of the same family), spawn with the valid slug, and open a separate PR to update the configured value or default table. Do not block the review on the slug issue. If the configured value is `inherit-parent` or `auto`, omit `model` instead; never treat those aliases as broken slugs or enter this fallback for them.
+If an entry cannot be dispatched (its runner subagent is missing, or the codex plugin is not installed), follow the runner table's recovery rule, spawn with what resolves, and open a separate PR to update the configured value or default table. Do not block the review on it. If the configured value is `inherit-parent` or `auto`, dispatch `general-purpose` with no `model`; never treat those aliases as broken entries.
 
 Read `references/reviewer-prompt.md` and fill in the template with:
 1. The stated intent

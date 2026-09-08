@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadModels, resolveModels, section } from "../tools/generate.mjs";
+import { EFFORT_LEVELS, loadModels, parseEntry, resolveModels, section } from "../tools/generate.mjs";
 import { markdownFiles } from "../tools/validate-skills.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -17,11 +17,16 @@ const models = loadModels();
 const available = new Set(models.available.map((m) => m.slug));
 
 describe("models.json shape", () => {
-  test("available slugs are unique and the defaults are among them", () => {
+  test("available slugs are unique, carry a vendor, and the panel entries name them", () => {
     expect(available.size).toBe(models.available.length);
-    expect(available.has(models.singleRoleDefault)).toBe(true);
-    for (const slug of models.panel) expect(available.has(slug)).toBe(true);
+    for (const m of models.available) expect(["claude", "codex"]).toContain(m.vendor);
+    for (const entry of models.panel) expect(available.has(parseEntry(entry, models).slug)).toBe(true);
     expect(new Set(models.panel).size).toBe(models.panel.length);
+  });
+
+  test("the panel spans both vendors so the adversarial signal is cross-vendor", () => {
+    const vendors = new Set(models.panel.map((entry) => parseEntry(entry, models).vendor));
+    expect(vendors).toEqual(new Set(["claude", "codex"]));
   });
 
   test("every role names an available model or the panel, and a skill directory that exists", () => {
@@ -33,7 +38,12 @@ describe("models.json shape", () => {
       expect(existsSync(join(skillsDir, role.skill, "SKILL.md"))).toBe(true);
       if (role.models === "panel") continue;
       expect(Array.isArray(role.models) && role.models.length > 0).toBe(true);
-      for (const slug of role.models) expect(available.has(slug)).toBe(true);
+      for (const entry of role.models) {
+        const parsed = parseEntry(entry, models);
+        expect(available.has(parsed.slug)).toBe(true);
+        if (parsed.effort) expect(EFFORT_LEVELS).toContain(parsed.effort);
+        if (role.claudeOnly) expect(parsed.vendor).toBe("claude");
+      }
     }
   });
 
@@ -52,10 +62,13 @@ describe("models.json shape", () => {
     expect(text.match(/^\s*\{ "/gm)).toHaveLength(rows);
   });
 
-  test("the codex examples name distinct models", () => {
-    expect(typeof models.codex.singleRoleExample).toBe("string");
-    expect(typeof models.codex.strongestRoleExample).toBe("string");
-    expect(new Set(models.codex.panelQuad).size).toBe(models.codex.panelQuad.length);
+  test("the codex substitutes are distinct Codex models and the strongest Claude slug is available", () => {
+    const { everydaySubstitute, strongestSubstitute, strongestClaude } = models.codex;
+    expect(everydaySubstitute).not.toBe(strongestSubstitute);
+    for (const slug of [everydaySubstitute, strongestSubstitute]) {
+      expect(models.available.find((m) => m.slug === slug)?.vendor).toBe("codex");
+    }
+    expect(models.available.find((m) => m.slug === strongestClaude)?.vendor).toBe("claude");
   });
 });
 

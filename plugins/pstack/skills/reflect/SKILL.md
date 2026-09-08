@@ -29,19 +29,19 @@ It covers the three layouts (flat `<id>.jsonl`, nested `<id>/<id>.jsonl`, subage
 
 ### 2. Spawn three reviewers in parallel
 
-One message, three `Agent` calls, `subagent_type: "general-purpose"`, explicit `model:` on each. Reviewers need MCP access for context lookups (tickets, chat threads, observability traces referenced in the transcript); pick a subagent_type that retains MCP access. The prompt forbids file writes; the parent applies edits.
+One message, three reviewers in parallel, each dispatched from its configured entry per the [runner table](../poteto-mode/references/runners.md). The judgment and divergent lenses are Claude-only: they need MCP access for context lookups (tickets, chat threads, observability traces referenced in the transcript). The tooling lens may run on a Codex entry, which reads the transcript file but has no Claude Code MCPs. The prompt forbids file writes; the parent applies edits.
 
-| Lens | `model` | Prompt template |
+| Lens | Entry | Prompt template |
 |---|---|---|
-| Judgment | your configured reflect-judgment model (default in [Models](#models)) | `references/judgment-reviewer.md` |
-| Tooling | your configured reflect-tooling model (default in [Models](#models)) | `references/tooling-reviewer.md` |
-| Divergent | your configured reflect-judgment model (default in [Models](#models)) | `references/divergent-reviewer.md` |
+| Judgment | your configured `reflect judgment, divergent, synthesizer` entry (default in [Models](#models)) | `references/judgment-reviewer.md` |
+| Tooling | your configured `reflect tooling` entry (default in [Models](#models)) | `references/tooling-reviewer.md` |
+| Divergent | your configured `reflect judgment, divergent, synthesizer` entry (default in [Models](#models)) | `references/divergent-reviewer.md` |
 
 Pass each template verbatim, substituting the transcript path or digest where marked. Reviewers return findings in the `Agent` response body.
 
 ### 3. Synthesize
 
-One `Agent` call, `subagent_type: "general-purpose"`, using your configured reflect-judgment model (default in [Models](#models)). Pick a subagent_type that retains MCP access — the synthesizer's quality check includes spot-verifying citations, which can require MCP access. Use `references/synthesizer.md` verbatim, with each reviewer's full output inlined where marked. The synthesizer returns a structured Accepted / Rejected / Backlog list.
+One `Agent` call on your configured `reflect judgment, divergent, synthesizer` entry (default in [Models](#models)), dispatched per the runner table. Claude-only: the synthesizer's quality check includes spot-verifying citations, which can require MCP access. Use `references/synthesizer.md` verbatim, with each reviewer's full output inlined where marked. The synthesizer returns a structured Accepted / Rejected / Backlog list.
 
 ### 4. Structural enforcement check
 
@@ -73,7 +73,7 @@ Short list, no preamble:
 
 ## Models
 
-Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
+Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`. An entry reads `<slug>@<effort>` and names a Claude or Codex model; dispatch each through the [runner table](../poteto-mode/references/runners.md).
 
-- reflect tooling: `claude-opus-5`
-- reflect judgment, divergent, synthesizer: `claude-opus-5`
+- reflect tooling: `gpt-5.6-terra@xhigh`
+- reflect judgment, divergent, synthesizer: `claude-fable-5-1@xhigh` (Claude entries only; this role needs Claude Code's MCP servers)

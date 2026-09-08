@@ -79,8 +79,7 @@ Aim for a complete **coverage map**, not a minimal one. Document the null, don't
 Launch all matching investigators in a single message so they run concurrently. Don't ask one agent to cover multiple MCPs.
 
 Subagent config (each):
-- `subagent_type`: `general-purpose`
-- `model`: your configured why-investigators model (default in [Models](#models))
+- runner: your configured `why investigators` entry (default in [Models](#models)), dispatched per the [runner table](../poteto-mode/references/runners.md). This role is Claude-only: a Codex run cannot see Claude Code's MCP servers, which are the evidence base here.
 - `readonly`: `false` (agent mode). **Do not use readonly/Ask mode.** It strips MCP access, which disables MCP-backed investigators entirely. Investigators still shouldn't write anything.
 
 Each investigator gets:
@@ -123,8 +122,7 @@ If your scope assessment suggests a single-commit trivial target where the PR de
 
 Spawn one synthesizer subagent:
 
-- `subagent_type`: `general-purpose`
-- `model`: your configured why-synthesizer model (default in [Models](#models))
+- runner: your configured `why synthesizer` entry (default in [Models](#models)), dispatched per the [runner table](../poteto-mode/references/runners.md). Claude-only, for the MCP access the quality check needs.
 - `readonly`: `false` (agent mode). The synthesizer's quality check spot-verifies citations, which can require MCP access. Readonly/Ask mode strips MCPs and defeats that.
 
 The synthesizer gets:
@@ -158,7 +156,7 @@ After the Sources Consulted block, if the user's `why` question is a precursor t
 
 ## Models
 
-Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
+Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`. An entry reads `<slug>@<effort>` and names a Claude or Codex model; dispatch each through the [runner table](../poteto-mode/references/runners.md).
 
-- why investigators: `claude-opus-5`
-- why synthesizer: `claude-opus-5`
+- why investigators: `claude-sonnet-5@high` (Claude entries only; this role needs Claude Code's MCP servers)
+- why synthesizer: `claude-fable-5-1@xhigh` (Claude entries only; this role needs Claude Code's MCP servers)

@@ -22,9 +22,8 @@ When in doubt, take the simple path.
 
 Decompose the question into 2 to 4 exploration angles, each a distinct slice of the subsystem. Spawn all explorers in a single message:
 
-- `subagent_type`: `general-purpose`
-- `model`: your configured how-explorer model (default in [Models](#models))
-- `readonly`: `true`
+- runner: your configured `how explorer` entry (default in [Models](#models)), dispatched per the [runner table](../poteto-mode/references/runners.md)
+- `readonly`: `true` (a Codex entry is read-only unless `--write` is passed; never pass it here)
 
 Each explorer gets the prompt in `references/explorer-prompt.md` with its angle filled in. Then go to Step 3.
 
@@ -32,9 +31,8 @@ Each explorer gets the prompt in `references/explorer-prompt.md` with its angle 
 
 Spawn one Task subagent that explores and explains in one pass:
 
-- `subagent_type`: `general-purpose`
-- `model`: your configured how-explainer model (default in [Models](#models))
-- `readonly`: `true`
+- runner: your configured `how explainer` entry (default in [Models](#models)), dispatched per the [runner table](../poteto-mode/references/runners.md)
+- `readonly`: `true` (a Codex entry is read-only unless `--write` is passed; never pass it here)
 
 Build its prompt from `references/explainer-prompt.md` without the explorer-findings section. Go to Step 4.
 
@@ -42,9 +40,8 @@ Build its prompt from `references/explainer-prompt.md` without the explorer-find
 
 Once all explorers have returned, spawn one Task subagent to synthesize their findings into one explanation:
 
-- `subagent_type`: `general-purpose`
-- `model`: your configured how-explainer model (default in [Models](#models))
-- `readonly`: `true`
+- runner: your configured `how explainer` entry (default in [Models](#models)), dispatched per the [runner table](../poteto-mode/references/runners.md)
+- `readonly`: `true` (a Codex entry is read-only unless `--write` is passed; never pass it here)
 
 Build its prompt from `references/explainer-prompt.md` with every explorer's findings filled in.
 
@@ -58,7 +55,7 @@ The explanation uses the sections defined in `references/explainer-prompt.md`, d
 
 ## Models
 
-Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`.
+Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`. An entry reads `<slug>@<effort>` and names a Claude or Codex model; dispatch each through the [runner table](../poteto-mode/references/runners.md).
 
-- how explorer: `claude-opus-5`
-- how explainer: `claude-opus-5`
+- how explorer: `gpt-5.6-terra@high`
+- how explainer: `claude-fable-5-1@xhigh`

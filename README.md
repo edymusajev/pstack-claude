@@ -1,5 +1,7 @@
 # pstack for Claude Code, Codex, Prime Agent, opencode, and Gemini CLI
 
+A fork of [michael-denyer/pstack-claude](https://github.com/michael-denyer/pstack-claude) that restores upstream's cross-vendor model panels on Claude Code: Claude models run as generated runner subagents with a pinned effort level, and OpenAI models run through the [codex plugin](https://github.com/openai/codex-plugin-cc). See [Model runners](#model-runners). The rest of this README is the port's.
+
 Claude Code port of [poteto](https://x.com/poteto)'s [pstack](https://github.com/cursor/plugins/tree/main/pstack) plugin. The skill tree is synced against upstream `e8d856f`, pstack v0.14.8 plus the September density pass. See [What's deliberately not ported](#whats-deliberately-not-ported). The same `skills/` tree ships as a Codex plugin and is discovered natively by [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent), [opencode](#opencode), and [Gemini CLI](#gemini-cli). Original by Lauren Tan; ships MIT. Imports seven skills from [cursor-team-kit](https://github.com/cursor/plugins/tree/main/cursor-team-kit) (also MIT): `deslop`, `thermo-nuclear-code-quality-review`, `make-pr-easy-to-review`, `fix-ci`, `fix-merge-conflicts`, `get-pr-comments`, `what-did-i-get-done`.
 
 > if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence.
@@ -101,14 +103,16 @@ Discovery is not a promise that Claude-specific execution details translate auto
 │   ├── skills/                       # 54 Agent Skills (shared by all five runtimes; the skills-only install boundary)
 │   │   ├── poteto-mode/references/licenses/  # generated license texts and skills-scoped notice
 │   │   ├── poteto-mode/references/codex-tools.md  # Claude→Codex tool/model/skill map
+│   │   ├── poteto-mode/references/runners.md  # how a model entry becomes a running subagent (table generated)
+│   │   ├── poteto-mode/scripts/codex-run.sh  # runs one Codex entry through the codex plugin's companion runtime
 │   │   ├── poteto-mode/references/agents/  # generated copies of agents/, for runtimes that install only skills
 │   │   └── poteto-mode/scripts/      # vendored bun/bash tooling: watch-pr, orch, worktree-audit.sh
 │   ├── .codex-plugin/prompts/        # 31 slash command stubs, generated (Codex only; link into ~/.codex/prompts)
 │   ├── hooks/                        # SessionStart auto-fire: injects the poteto-mode mandate (Claude Code only)
-│   └── agents/                       # Claude subagents: poteto-agent, comment-sicko (Codex routes via codex-tools.md)
+│   └── agents/                       # Claude subagents: poteto-agent, comment-sicko, plus one generated runner per Claude entry in models.json
 ├── tests/skill-collision-repro.sh    # behavioral slash-menu check (needs claude CLI)
 ├── tests/agent-skills.test.mjs       # shared metadata, portable assets, path checks, and Codex prompt boundary
-├── tools/generate.mjs                # stamps versioned, model, prompt, README, and portable-asset copies
+├── tools/generate.mjs                # stamps versioned, model, runner-agent, prompt, README, and portable-asset copies
 ├── tools/validate-skills.mjs         # rejects missing/escaping links and instructions to open unreachable paths
 ├── tools/sync.mjs                    # syncs a component to a new upstream SHA, applying substitutions.json
 ├── tools/upstream.json               # upstream remote, per-component pinned SHAs, and excluded upstream paths
@@ -124,6 +128,17 @@ Discovery is not a promise that Claude-specific execution details translate auto
 
 Plugin-internal path references in the docs below (`skills/<name>/`, `.codex-plugin/prompts/<name>.md`) are relative to `plugins/pstack/`.
 
+## Model runners
+
+pstack's multi-model skills (`arena`, `architect`, `interrogate`, `reflect`) get their adversarial signal from model diversity, and upstream's defaults split the single-model roles by strength across Anthropic, OpenAI, and xAI. This fork keeps that shape on Claude Code with two vendors.
+
+A model is named by an entry, `<slug>` or `<slug>@<effort>`, in `plugins/pstack/models.json`, in each skill's stamped Models section, and in the per-user override sheet `/setup-pstack` writes. The [runner table](plugins/pstack/skills/poteto-mode/references/runners.md) says how each entry runs:
+
+- **Claude entries** (`claude-fable-5-1@xhigh`, `claude-opus-5@high`, `claude-sonnet-5@high`) run as generated plugin subagents under `plugins/pstack/agents/`, one per distinct entry, whose frontmatter carries the full model ID and the `effort` key. That is the only place Claude Code accepts both: the `Agent` tool's `model` parameter takes just `sonnet`, `opus`, `haiku`, and `fable`, and it has no effort parameter. A skill dispatches `subagent_type: "pstack:fable-5-1-xhigh"` and the entry is applied.
+- **Codex entries** (`gpt-6-astra@high`, `gpt-5.6-terra@xhigh`) run through `skills/poteto-mode/scripts/codex-run.sh`, a wrapper over the codex plugin's companion runtime that passes the slug and effort through, runs read-only unless told to write, and returns Codex's final message on stdout. A panel fans out as parallel background `Bash` calls beside the `Agent` calls for the Claude seats.
+
+Defaults follow upstream's role map one effort notch down: the roles upstream ran on Fable 5.1 at max run at `xhigh`; the panel is Fable 5.1, GPT-6 Astra, GPT-5.6 Terra, and Opus 5; the fast code and explorer roles upstream gave to grok go to Terra. Three roles are pinned to Claude entries because they depend on Claude Code's MCP servers, which a Codex run cannot see: the `why` investigators and synthesizer, and reflect's judgment lenses. The generator refuses a Codex default for them. `/setup-pstack` detects both vendors (the Codex list comes from `~/.codex/models_cache.json`), validates every entry, and writes a personal runner to `~/.claude/agents/` for any Claude entry the plugin does not ship.
+
 ## Running on Codex
 
 The Codex and Claude Code builds use the same `skills/` tree. Codex-specific generation adds prompt stubs from each public skill's row in the slash-command table below. The shared generator also stamps manifest versions, model-policy sections, and five portable assets. One mapping file handles the Claude-to-Codex translation, the same structure `superpowers` uses for Codex. pstack diverges in one respect. superpowers writes its skills in tool-neutral language, so no skill names a runtime tool. pstack keeps the upstream Claude-native instructions and adds a platform-mapping reference to each affected skill. Both direct skill invocation and the optional Codex prompt stubs reach that mapping.
@@ -133,7 +148,7 @@ The Codex and Claude Code builds use the same `skills/` tree. Codex-specific gen
 - **Tool, model, and built-in mapping.** When a skill names a Claude tool (the `Agent` tool, `AskUserQuestion`), a `claude-*` model slug, or a Claude built-in skill (`run`, `verify`, `loop`, `plugin-dev:skill-development`), it resolves through [`skills/poteto-mode/references/codex-tools.md`](plugins/pstack/skills/poteto-mode/references/codex-tools.md). `poteto-mode`'s Platform Adaptation section, affected skill entry points, and every generated Codex stub point there; skill-specific mappings sit in its Per-skill notes table.
 - **Subagents.** The `Agent` tool maps to Codex `spawn_agent` / `wait_agent` / `close_agent`, enabled by `multi_agent = true`. Parallel fan-out is multiple `spawn_agent` calls in one turn. Without the flag, `interrogate`, `arena`, `how`, `why`, `reflect`, and `architect` degrade to a single sequential pass. There is no `poteto-agent` subagent type on Codex; route ad-hoc subagents by dispatching a `spawn_agent` told to read `poteto-mode` first.
 - **Auto-fire.** The `hooks/` SessionStart injection is Claude Code-only; Codex has no plugin hook runtime. Enter `pstack:poteto-mode` by name, or add a standing instruction to `~/.codex/AGENTS.md` if you want the same always-on routing.
-- **Models.** The `claude-*` slugs in skills are Claude defaults, stamped into each skill's Models section from `plugins/pstack/models.json`. On Codex substitute your configured Codex models, keeping multi-model panels genuinely diverse. `/setup-pstack` writes `~/.codex/pstack-models.md` (referenced from `~/.codex/AGENTS.md`) with Codex slugs instead of `~/.claude/pstack-models.md`.
+- **Models.** Each skill's Models section names cross-vendor entries (`<slug>@<effort>`) stamped from `plugins/pstack/models.json`. On Codex a `gpt-*` entry passes through as model plus reasoning effort; a `claude-*` entry does not resolve, so substitute a Codex model per the mapping's Model names section, keeping panels diverse. `/setup-pstack` writes `~/.codex/pstack-models.md` (referenced from `~/.codex/AGENTS.md`) with Codex slugs instead of `~/.claude/pstack-models.md`.
 
 Verified on a live Codex session installed via the symlinks: the user-facing skills are discovered and namespaced under `pstack` (`pstack:poteto-mode`, `pstack:interrogate`, and so on). The `principle-*` leaf skills carry `user-invocable: false` and no command, so Codex does not surface them in the picker, the same as Claude Code. They stay installed for `poteto-mode` to read by path. The deeper behaviors (mapping resolution mid-task, `spawn_agent` fan-out) follow the proven `superpowers` pattern and are worth confirming in your own session.
 
@@ -166,7 +181,7 @@ Not declared as deps, but referenced in skill bodies:
 - **`gt` (Graphite CLI)** — only for the Orchestrate playbook and the `orch` script's stack frontier. Since the v0.14.8 sync, Shipping and the autopilots stack with plain `gh` (or Origin's CLI when present) and never require `gt`.
 - **`jq` and `rg` (ripgrep)** — only for `scripts/worktree-audit.sh` (the Worktree cleanup playbook). Without them the audit still runs but blanks its PR and LAST_CHAT columns, so it warns on stderr rather than returning a table that looks complete.
 
-No third-party plugins. The harsher-critique escape hatch lives in the bundled `thermo-nuclear-code-quality-review` skill (imported from cursor-team-kit), not in an external plugin.
+One optional plugin: the [codex plugin](https://github.com/openai/codex-plugin-cc) (`/plugin install codex@openai-codex`, then `/codex:setup`) plus a logged-in codex CLI, for every Codex entry in the model policy. Without it the Codex seats in a panel fall back to Claude entries and the skill says so. The harsher-critique escape hatch still lives in the bundled `thermo-nuclear-code-quality-review` skill.
 
 ## Slash commands
 
@@ -177,7 +192,7 @@ No third-party plugins. The harsher-critique escape hatch lives in the bundled `
 | `/why` | investigate why something was built this way (parallel multi-MCP evidence) |
 | `/architect` | settle types and module shape before writing code that crosses a function boundary |
 | `/arena` | run N parallel attempts at the same task and pick the best parts |
-| `/interrogate` | have three different models try to break a diff |
+| `/interrogate` | have four models from two vendors try to break a diff |
 | `/automate-me` | draft your own personal -mode skill from recent transcripts |
 | `/reflect` | capture a long task's lessons as a skill edit |
 | `/tdd` | fix a bug by writing the failing test first, then the fix |
@@ -243,14 +258,16 @@ The port is editorial, not mechanical. Anywhere upstream pstack assumed Cursor-s
 | Cursor's `/goal` (standing objective across turns) | The program objective written into the run's standing orders and restated in the todolist |
 | The Cursor agent store (path in the system prompt) | `~/.claude/orchestrate/<project-slug>/`, which survives the session restarts a multi-day program expects |
 | Model rule `~/.cursor/rules/pstack-models.mdc` | Override sheet `~/.claude/pstack-models.md`, included from `CLAUDE.md` |
-| Model `composer-2.5-fast` (Cursor) | `claude-sonnet-4-6` |
-| Model `claude-opus-4-X-thinking-xhigh` (Cursor UI variant) | `claude-opus-5` (extended thinking configured separately) |
-| Models `gpt-5.3-codex-high-fast`, `gpt-5.5-high-fast` (via Cursor) | `claude-sonnet-4-6`, `claude-haiku-4-5` (Claude family) |
-| Multi-model panels (arena, architect, interrogate) | Default panel is `claude-opus-5` + `claude-fable-5` + `claude-sonnet-5` — three distinct models across three tiers (replaces the cross-vendor diversity lost in translation). |
+| Model variant `claude-fable-5-1-thinking-max` (Cursor UI variant) | Entry `claude-fable-5-1@xhigh`, one notch down, run as the generated `pstack:fable-5-1-xhigh` subagent whose frontmatter pins the model and effort |
+| Models `gpt-5.6-sol-max` (via Cursor) | Entry `gpt-5.6-terra@xhigh`, run through the codex plugin |
+| Model `grok-4.6-fast-xhigh` (via Cursor) | `gpt-5.6-terra@high` for the fast code and explorer roles, `gpt-6-astra@high` for its panel seat; `claude-sonnet-5@high` where the role needs Claude Code's MCP servers |
+| Multi-model panels (arena, architect, interrogate) | Default panel is `claude-fable-5-1@xhigh`, `gpt-6-astra@high`, `gpt-5.6-terra@xhigh`, `claude-opus-5@high` — two vendors, four models, upstream's shape one effort notch down |
 
 ### What's lost in translation
 
-**Cross-vendor model diversity.** `arena`, `interrogate`, `architect`, and `how` all rely on stress-testing a design against several *different* model families. Claude Code is single-vendor, so the split collapses to three Claude variants by tier. Instead of bridging to an external CLI for that diversity, the rewiring routes the "harsher pass" to the bundled `thermo-nuclear-code-quality-review` skill — different style of pressure (strict maintainability rubric), not vendor diversity, but it lives in-plugin with no extra installs.
+**Grok.** Upstream runs its fast mechanical-code roles and one panel seat on `grok-4.6-fast`. Neither Claude Code nor the codex plugin reaches xAI, so those seats go to GPT-5.6 Terra and GPT-6 Astra (see [Model runners](#model-runners)).
+
+**Per-call effort on Claude.** Cursor's `-thinking-max` variants set reasoning effort per subagent at the call site. Claude Code's `Agent` tool has no effort parameter and takes only family aliases for `model`, so the fork moves both into generated subagent definitions instead; the cost is one plugin agent per distinct Claude entry.
 
 ### What's deliberately kept
 
@@ -270,7 +287,7 @@ Each path below is listed under `exclude` for the `pstack` component in `tools/u
 - **`skills/make-bot-ui/`** (upstream `799151d`, `6fecddb`) — builds a page that wakes a Grok Bot over a webhook routine created with Cursor's `update_state` tool and exposed on Tailscale. Every step is Cursor-runtime plumbing with no Claude Code counterpart, the same category as Benny.
 - **`assets/logo.png`** (upstream `efa2a53`, `7314f72`) — the Cursor marketplace logo. Claude Code plugin manifests carry no logo field.
 - **`disable-model-invocation: true` on `how`, `why`, `unslop`, `typescript-best-practices`** (upstream `73f8be4`) — on Claude Code that flag makes the Skill tool refuse the invocation outright, which breaks the SessionStart mandate. The 0.9.8 invariant in `tools/generate.mjs` rejects it on every skill.
-- **Fable 5.1 slug defaults** (upstream `23a56e2`) — model defaults live in `plugins/pstack/models.json` and are stamped by the generator, so upstream's slug bumps are never copied into skill prose.
+- **Model slugs in skill prose** (upstream `23a56e2` and every later bump) — model defaults live in `plugins/pstack/models.json` and are stamped by the generator, so upstream's slug bumps are never copied into skill prose. The fork carries upstream's Fable 5.1 defaults through that file.
 - **`cursor-team-kit` beyond the seven imported skills** — the rest either duplicate Claude Code built-ins (`verify-this` → the `verify` skill and built-in verification discipline; `check-compiler-errors` → LSP diagnostics; `control-cli`/`control-ui` → `run`/`verify`, already the substitution targets) or overlap skills this port ships (`loop-on-ci`, `review-and-ship`, `weekly-review` vs `babysit`, `fix-ci`, `make-pr-easy-to-review`, `what-did-i-get-done`). `pr-review-canvas` is Cursor-UI-specific.
 
 ### Forking note
