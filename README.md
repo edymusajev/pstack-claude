@@ -254,7 +254,7 @@ The port is editorial, not mechanical. Anywhere upstream pstack assumed Cursor-s
 | Transcripts at `~/.cursor/projects/*/` or `agent-transcripts/` | `~/.claude/projects/<encoded-cwd>/*.jsonl` (where `<encoded-cwd>` is the workspace cwd with `/` → `-`) |
 | Skill paths `.cursor/skills/`, `~/.cursor/plugins/` | `.claude/skills/`, `~/.claude/plugins/` |
 | MCP discovery via Cursor's `mcps/` directory | Tool list at top of system prompt (`mcp__<server>__<name>` entries), or `.mcp.json`, or `claude mcp list` |
-| Cursor cloud agents (`environment: "cloud"`, `cloud_base_branch`) | Local background subagents (`run_in_background: true`), isolated by git worktree |
+| Cursor cloud agents (`environment: "cloud"`, `cloud_base_branch`) | Background subagents (`run_in_background: true`), preferring Coder via the project-local `/cloud-workspace` skill; local worktrees only for small changes verified without package installs |
 | Cursor's `/goal` (standing objective across turns) | The program objective written into the run's standing orders and restated in the todolist |
 | The Cursor agent store (path in the system prompt) | `~/.claude/orchestrate/<project-slug>/`, which survives the session restarts a multi-day program expects |
 | Model rule `~/.cursor/rules/pstack-models.mdc` | Override sheet `~/.claude/pstack-models.md`, included from `CLAUDE.md` |

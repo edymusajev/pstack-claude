@@ -2,7 +2,7 @@
 
 Invoked at the end of every other playbook.
 
-**Worktree.** Work from a git worktree off main; subagents inherit it. Multiple `Agent` calls on the same branch each get their own worktree, or `git fetch && git reset --hard origin/<branch>` between them. Dirty branch with unrelated work: patch out, fresh worktree, apply. Snarled worktree: reset from main, redo minimally. Before you commit, merge, or deploy from a worktree, list the live agents and stop every one that holds it, including grandchildren you never launched; a delegate's children do not inherit its brief, so a read-only instruction never reaches them. Confirm each stop, then run `git status` and read the tree you are about to ship.
+**Workspace.** Follow [Workspace selection](../SKILL.md#workspace-selection) before creating a checkout. Prefer Coder via the project's local `/cloud-workspace` skill; a local worktree is only for a small change whose verification needs no package installs. Start from main, or the parent branch for a stack. Give each concurrent writer an exclusive workspace or checkout and preserve unrelated work. Before you commit, merge, or deploy from a workspace, list the live agents and stop every one that holds it, including grandchildren you never launched; a delegate's children do not inherit its brief, so a read-only instruction never reaches them. Confirm each stop, then run `git status` and read the tree you are about to ship.
 
 **Commits.** Commit liberally; rebase into small, ordered commits before opening PRs. Each commit is a future PR: landable, ordered to tell the story. Amend when the fix belongs in a just-made commit; new commit when separable.
 

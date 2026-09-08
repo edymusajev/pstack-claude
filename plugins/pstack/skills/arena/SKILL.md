@@ -27,11 +27,11 @@ The N candidates will receive the same prompt, so the prompt is the contract.
 1. State the artifact each candidate is producing.
 2. Derive the rubric. State what success looks like for *this* task, then turn it into 3-6 concrete gradeable criteria. The rubric is the picker's tool in Phase D; candidates only see the task.
 3. Pick the runners. Use `arena runners` from `~/.claude/pstack-models.md` when present. Otherwise run one each on the defaults in [Models](#models). Spawn more when the arena covers multiple design directions. Same model N times when the work is generation-bound rather than judgment-sensitive.
-4. Assign output paths. Each candidate writes to its own location (a git worktree where possible, otherwise `/tmp/arena-<slug>/candidate-<n>/`), per the **separate-before-serializing-shared-state** principle skill.
+4. Assign output paths. Each candidate writes to its own location (for code, follow [Workspace selection](../poteto-mode/SKILL.md#workspace-selection): prefer Coder via the local `/cloud-workspace` skill, with local worktrees only for small changes verified without package installs; for standalone artifacts, use `/tmp/arena-<slug>/candidate-<n>/`), per the **separate-before-serializing-shared-state** principle skill.
 
 ## Phase B: Fan out
 
-Spawn all N candidates in one message with `run_in_background: true`, each dispatched from its runner entry per the [runner table](../poteto-mode/references/runners.md) (a Codex candidate gets `--write --cwd <its output path>`), each with the task, the path to the shared grounding, its own output path, and instructions to produce both the artifact and a short rationale.
+Spawn all N candidates in one message with `run_in_background: true`, each dispatched from its runner entry per the [runner table](../poteto-mode/references/runners.md) (a local Codex candidate gets `--write --cwd <its output path>`; for Coder, follow the local skill's remote execution instructions), each with the task, the path to the shared grounding, its own output path, and instructions to produce both the artifact and a short rationale.
 
 Each rationale names the alternatives the candidate considered and what it rejected.
 

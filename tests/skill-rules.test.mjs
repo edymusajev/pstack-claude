@@ -18,7 +18,7 @@ const rules = [
   {
     source: "#58 delegate isolation",
     file: "poteto-mode/playbooks/feature.md",
-    phrase: "Give every file-writing delegate its own worktree",
+    phrase: "Give every file-writing delegate its own workspace or checkout",
   },
   {
     source: "#59 item 1 drain the roster",

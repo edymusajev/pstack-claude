@@ -24,13 +24,13 @@ Open a todolist with one entry per phase before launching anything.
 2. Choose the shape. Partition into slices, race N workers on identical briefs, or mix both. For a race or mixed shape, declare `first pass`, `rank all`, or `best-of` before spawning.
 3. Set N from the user or derive it from the shape. N is total workers, not the number that run at once.
 4. Pick the worker entry from `swarm workers` in `~/.claude/pstack-models.md` when present. Otherwise use the default in [Models](#models). For a model race, name each arm's entry up front. A worker that drives the app through the `verify` or `run` built-ins, or that needs Claude Code's MCP servers, must be a Claude entry; a Codex worker has neither.
-5. Give each worker its own writable output when it writes.
+5. Give each worker its own writable output when it writes. For code changes, follow [Workspace selection](../poteto-mode/SKILL.md#workspace-selection): prefer Coder via the local `/cloud-workspace` skill; local worktrees qualify only for small changes verified without package installs.
 
 ## Phase B: Fan out
 
-Spawn all N workers in one message with `run_in_background: true`, each dispatched from the configured entry per the [runner table](../poteto-mode/references/runners.md); a Codex worker that writes gets `--write --cwd <its worktree>`. Claude Code subagents all run on this machine, so isolation comes from the worktree or output directory assigned in Phase A, not from a remote environment.
+Spawn all N workers in one message with `run_in_background: true`, each dispatched from the configured entry per the [runner table](../poteto-mode/references/runners.md); a Codex worker that writes locally gets `--write --cwd <its checkout or output directory>`. For Coder, use the access and execution instructions from the local `/cloud-workspace` skill. A local runner does not make a remote path available through `--cwd`.
 
-When a worker must start from a non-default branch, check that branch out in the worker's own worktree and name the worktree path in its brief.
+When a worker must start from a non-default branch, check that branch out in the worker's assigned checkout and name the environment and checkout path in its brief.
 
 Every brief stands alone. Include the goal, scope, exact slice or race arm, how to verify, and what to report. Reports use `PASS`, `ISSUES`, or `BLOCKED` with evidence.
 

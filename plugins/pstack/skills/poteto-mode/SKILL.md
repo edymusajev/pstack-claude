@@ -9,6 +9,14 @@ description: poteto's agent style for concise, detailed responses, deliberate su
 
 These skills use Claude Code tool names (the `Skill` tool, the `Agent` tool, `AskUserQuestion`) and Claude model slugs (`claude-*`). On Claude Code they work as written. On Codex, read [`references/codex-tools.md`](references/codex-tools.md) for the Codex equivalent of a Claude tool, model, or built-in skill (`run`, `verify`, `plugin-dev:skill-development`). Other runtimes can discover the same Agent Skills tree, but they must use their own tool, model, and configuration equivalents. `codex-tools.md` is not a cross-runtime map.
 
+## Workspace selection
+
+Prefer a Coder workspace when available. Before choosing an environment, discover and read the target project's local `/cloud-workspace` skill and follow its instructions, including any pool skill it routes to. Use its commands for access, setup, verification, and cleanup; do not assume raw Coder commands or a particular remote checkout path.
+
+Use a local git worktree only when the change is small and all required verification can run without installing packages in that worktree. If verification needs a package install, move the work to Coder. If Coder is unavailable and the change does not qualify for the local exception, report the environment blocker rather than silently installing dependencies in a worktree.
+
+This policy takes precedence over worktree defaults throughout the playbooks and delegated workflows. Give each writer an exclusive workspace or checkout, and put the selected environment, access instructions, and verification commands in every delegate's brief. A branch alone does not isolate writers sharing a checkout. For read-only analysis or standalone reports, a separate output directory is enough.
+
 ## Non-negotiables
 
 The Principles section below grounds every trigger. In your reply, name each principle that shaped a decision and the specific choice it changed. Cite only principles whose leaf SKILL.md you read this session.
