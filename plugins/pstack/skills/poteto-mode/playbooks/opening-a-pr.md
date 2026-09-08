@@ -2,6 +2,8 @@
 
 Invoked at the end of every other playbook.
 
+**Completion gate.** For Feature work, run the [checkpoint checks](../references/workflow-gates.md#checkpoint) before each commit and before PR creation. After the final edit, reconcile the verification matrix and every safety claim against the actual results and unresolved tradeoffs. Do not broaden a partial surface check into complete coverage. An explicit user waiver stays visible in the PR. This audit precedes PR creation; creating the PR is not one of its own prerequisites.
+
 **Workspace.** Follow [Workspace selection](../SKILL.md#workspace-selection) before creating a checkout. Prefer Coder via the project's local `/cloud-workspace` skill; a local worktree is only for a small change whose verification needs no package installs. Start from main, or the parent branch for a stack. Give each concurrent writer an exclusive workspace or checkout and preserve unrelated work. Before you commit, merge, or deploy from a workspace, list the live agents and stop every one that holds it, including grandchildren you never launched; a delegate's children do not inherit its brief, so a read-only instruction never reaches them. Confirm each stop, then run `git status` and read the tree you are about to ship.
 
 **Commits.** Commit liberally; rebase into small, ordered commits before opening PRs. Each commit is a future PR: landable, ordered to tell the story. Amend when the fix belongs in a just-made commit; new commit when separable.

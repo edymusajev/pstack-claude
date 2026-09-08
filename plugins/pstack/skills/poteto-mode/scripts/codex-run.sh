@@ -89,4 +89,7 @@ else
   args+=("${prompt[*]}")
 fi
 
+if [[ $write -eq 1 ]]; then
+  exec node "$(dirname "$0")/codex-writer.mjs" "$companion" "${args[@]}"
+fi
 exec node "$companion" "${args[@]}"
