@@ -1,3 +1,7 @@
+## 0.10.2 - Feature checkpoints and Codex writer ownership
+
+Port-specific coordination guards for the Claude/Codex runner boundary. Feature work keeps a persistent evidence checkpoint, verification matrix, and unresolved review findings. Commit and PR checks reject stale or incomplete records; resume hooks point back to them. Codex writer launches acquire an exclusive checkout lease and require a confirmed companion result before handoff. Claude hooks reject direct edits and literal shell access to leased checkouts. The workflow reference documents the unguarded remote, opaque-shell, and other-runtime paths; this is not a sandbox or proof of evidence quality. These deliberate fork changes extend upstream workflow text and must be retained or reconciled during sync.
+
 ## 0.10.1 - subscription model defaults and Codex evidence access
 
 Model policy: use Astra low for `how explorer` and `why investigators`, Sol for routine implementation and swarm/tooling work, Fable high for synthesis and prose, and Fable/Astra xhigh for the two-model panel and difficult work. Regenerate all model sections, setup defaults, and runner agents from `models.json`.

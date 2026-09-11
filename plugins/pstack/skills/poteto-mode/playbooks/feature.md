@@ -2,6 +2,8 @@
 
 **You own the design. Plan, review, verify.** Delegate implementation; stay in the lead.
 
+Initialize and maintain the persistent [workflow checkpoint](../references/workflow-gates.md#checkpoint) before implementation. Define the verification matrix before delegation, update it at phase boundaries, and reread it after compaction. Pending checks and review disagreements survive the handoff.
+
 1. `how` over the affected subsystem.
 2. `architect` for parallel design exploration. Skipping stays as `architect skipped: <reason>`; do not fold the design decision silently into implementation.
 3. Write the throughput checkpoint as four todo items. A dimension that genuinely does not apply (single file, no fan-out) keeps its item with `n/a: <reason>` rather than being dropped:
@@ -13,9 +15,11 @@
 5. Verify on the matching surface. "Inconclusive" or wrong-surface is not a pass; flag it.
 6. Rebase into small, ordered commits; stack follow-ups.
    Use the **sequence-verifiable-units** principle skill, building, verifying, and committing each small unit before the next.
-7. If the design is contested, `interrogate` before shipping.
+7. If the design is contested, `interrogate` before shipping. Overruling a reviewer's correctness or safety finding keeps it contested until the checkpoint records a fix, an `interrogate` result, or an explicit user waiver.
 8. Run **Opening a PR**.
 
 Code-coupled work (one feature, one migration) goes to a single owner with the checkpoint inline; that owner fans out internally after the blocking phase. Parent-level fan-out is for slices that produce independent artifacts (audits, cross-subsystem investigations, competing experiments). Rewrite the checkpoint at phase boundaries; spawn a fresh owner rather than chaining interrupts.
+
+Use the [writer handoff](../references/workflow-gates.md#writer-ownership) for Codex delegates. Do not overlap the parent's edits, suites, or commits with a writer's ownership, even across different directories. Review and verify each unit after handoff, then commit it before starting the next unit.
 
 **Reply:** what you built, what you chose and why, the throughput checkpoint, open decisions. Tables for design alternatives.

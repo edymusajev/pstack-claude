@@ -2,13 +2,30 @@
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup|clear|compact",
+        "matcher": "startup|clear|compact|resume",
         "hooks": [
           {
             "type": "command",
             "command": "cat \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start-context.md\"",
             "shell": "bash",
             "async": false
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/poteto-mode/scripts/workflow-hook.mjs\"",
+            "shell": "bash"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/poteto-mode/scripts/workflow-hook.mjs\"",
+            "shell": "bash"
           }
         ]
       }
