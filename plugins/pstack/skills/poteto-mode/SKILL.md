@@ -154,7 +154,7 @@ A large or cross-cutting effort (a migration across many call sites, an ambitiou
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`. An entry reads `<slug>@<effort>` and names a Claude or Codex model; dispatch each through the [runner table](../poteto-mode/references/runners.md).
 
-- feature, refactoring: `gpt-5.6-sol@xhigh`
+- feature, refactoring: `gpt-5.6-sol@medium`
 - bug-fix: `gpt-6-astra@xhigh`
 - perf-issue: `gpt-6-astra@xhigh`
 - hillclimb: `gpt-6-astra@xhigh`

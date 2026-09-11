@@ -50,4 +50,4 @@ Return one consolidated in-chat report with the table, issue one-liners, gaps or
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in `~/.claude/pstack-models.md` overrides each at runtime; see `/setup-pstack`. An entry reads `<slug>@<effort>` and names a Claude or Codex model; dispatch each through the [runner table](../poteto-mode/references/runners.md).
 
-- swarm workers: `gpt-5.6-sol@high`
+- swarm workers: `gpt-5.6-sol@low`

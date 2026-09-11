@@ -6,10 +6,11 @@ pstack names models as entries. An entry reads `<slug>` or `<slug>@<effort>`: th
 
 | Entry | Vendor | Runs as | Dispatch |
 |---|---|---|---|
-| `gpt-5.6-sol@xhigh` | codex | GPT-5.6 Sol, xhigh effort | `../scripts/codex-run.sh --model gpt-5.6-sol --effort xhigh` |
+| `gpt-5.6-sol@medium` | codex | GPT-5.6 Sol, medium effort | `../scripts/codex-run.sh --model gpt-5.6-sol --effort medium` |
 | `gpt-6-astra@xhigh` | codex | GPT-6 Astra, xhigh effort | `../scripts/codex-run.sh --model gpt-6-astra --effort xhigh` |
 | `claude-fable-5-1@high` | claude | Fable 5.1, high effort | `subagent_type: "pstack:fable-5-1-high"` |
 | `claude-fable-5-1@xhigh` | claude | Fable 5.1, xhigh effort | `subagent_type: "pstack:fable-5-1-xhigh"` |
+| `gpt-5.6-sol@low` | codex | GPT-5.6 Sol, low effort | `../scripts/codex-run.sh --model gpt-5.6-sol --effort low` |
 | `gpt-6-astra@low` | codex | GPT-6 Astra, low effort | `../scripts/codex-run.sh --model gpt-6-astra --effort low` |
 | `gpt-5.6-sol@high` | codex | GPT-5.6 Sol, high effort | `../scripts/codex-run.sh --model gpt-5.6-sol --effort high` |
 

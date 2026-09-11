@@ -53,13 +53,13 @@ Write `~/.claude/pstack-models.md` with the shape below. Overwrite the whole fil
 
 Per-role model overrides for pstack skills. Each pstack SKILL.md names its defaults in a Models section; the values here override those defaults. Delete a line to fall back to the skill default. An entry is `<slug>` or `<slug>@<effort>`: a Claude model runs as the matching `pstack:` runner subagent, a Codex model runs through the codex plugin, and a missing effort inherits the session's level. A value of `inherit-parent` or `auto` runs that role on the parent session's model and effort (dispatch `general-purpose`, or `pstack:poteto-agent` for a code-writing brief, with no `model`); an alias entry in a panel list still counts toward that panel's fan-out.
 
-feature, refactoring: gpt-5.6-sol@xhigh
+feature, refactoring: gpt-5.6-sol@medium
 bug-fix: gpt-6-astra@xhigh
 perf-issue: gpt-6-astra@xhigh
 hillclimb: gpt-6-astra@xhigh
 judgment and prose: claude-fable-5-1@high
 strongest judgment: claude-fable-5-1@xhigh
-how explorer: gpt-6-astra@low
+how explorer: gpt-5.6-sol@low
 how explainer: claude-fable-5-1@high
 why investigators: gpt-6-astra@low
 why synthesizer: claude-fable-5-1@high
@@ -67,7 +67,7 @@ reflect tooling: gpt-5.6-sol@high
 reflect judgment, divergent, synthesizer: claude-fable-5-1@high
 arena runners: claude-fable-5-1@xhigh, gpt-6-astra@xhigh
 arena cross-judge pool: claude-fable-5-1@xhigh, gpt-6-astra@xhigh
-swarm workers: gpt-5.6-sol@high
+swarm workers: gpt-5.6-sol@low
 architect runners: claude-fable-5-1@xhigh, gpt-6-astra@xhigh
 interrogate reviewers: claude-fable-5-1@xhigh, gpt-6-astra@xhigh
 ```
